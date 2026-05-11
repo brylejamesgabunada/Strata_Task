@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n-automation
+    restart: unless-stopped
+    ports:
+      - "5678:5678"  # Change if port 5678 is taken
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=changeme
+      - N8N_HOST=localhost
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Asia/Manila
+      - N8N_ENCRYPTION_KEY=your-random-key-here
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - n8n-network
+
+volumes:
+  n8n-data:
+
+networks:
+  n8n-network:
+    driver: bridge
