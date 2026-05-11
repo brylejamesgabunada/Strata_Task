@@ -1,0 +1,308 @@
+{
+  "name": "Strata AI Enquiry Processor (Sheets KB)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "strata-enquiry",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e01795d5-89fe-4890-9acf-586b0d3695c1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-544, 400],
+      "webhookId": "839e2784-45a1-499b-ad72-a0b2d26a7177"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "message",      "value": "={{$json[\"message\"]}}" },
+            { "name": "sender_name",  "value": "={{$json[\"sender_name\"] || \"\"}}" },
+            { "name": "sender_email", "value": "={{$json[\"sender_email\"] || \"\"}}" },
+            { "name": "sender_phone", "value": "={{$json[\"sender_phone\"] || \"\"}}" },
+            { "name": "channel",      "value": "={{$json[\"channel\"] || \"web\"}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2fa2f9e6-3ef8-4ac5-bad4-534c346b64b3",
+      "name": "Set Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [-336, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env[\"MCP_SERVER_URL\"]}}/tools/verify_client",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer ={{$env[\"MCP_API_KEY\"]}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "email", "value": "={{$json.sender_email}}" },
+            { "name": "phone", "value": "={{$json.sender_phone}}" },
+            { "name": "name",  "value": "={{$json.sender_name}}" }
+          ]
+        },
+        "options": { "timeout": 5000 }
+      },
+      "id": "d8ee4054-2893-4014-acad-90911d56556f",
+      "name": "MCP: Verify Client Identity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-112, 400],
+      "notes": "Calls your MCP-compatible client database tool. Returns: { found: bool, client_id, full_name, status, lots[], account_manager, levy_status, open_requests, portal_access }. Set MCP_SERVER_URL and MCP_API_KEY as environment variables."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst mcp  = item.json;\nconst prev = $('Set Input').first().json;\n\nlet identityBlock = '';\nlet clientStatus  = 'new';\nlet clientProfile = {};\n\nif (mcp.found === true || mcp.client_id) {\n  clientStatus = mcp.status === 'inactive' ? 'inactive_former' : 'existing';\n  clientProfile = {\n    client_id:       mcp.client_id || '',\n    full_name:       mcp.full_name || prev.sender_name,\n    status:          mcp.status   || 'active',\n    lots:            mcp.lots     || [],\n    account_manager: mcp.account_manager || '',\n    levy_status:     mcp.levy_status     || 'unknown',\n    open_requests:   mcp.open_requests   || 0,\n    portal_access:   mcp.portal_access   || false\n  };\n\n  const lotsSummary = clientProfile.lots.length > 0\n    ? clientProfile.lots.map(l => `Lot ${l.lot_number} at ${l.building} (${l.role})`).join('; ')\n    : 'No lots on file';\n\n  identityBlock = [\n    `## Verified Client Profile`,\n    `- Client ID: ${clientProfile.client_id}`,\n    `- Name: ${clientProfile.full_name}`,\n    `- Account Status: ${clientProfile.status}`,\n    `- Lots: ${lotsSummary}`,\n    `- Account Manager: ${clientProfile.account_manager || 'Unassigned'}`,\n    `- Levy Status: ${clientProfile.levy_status}`,\n    `- Open Requests: ${clientProfile.open_requests}`,\n    `- Portal Access: ${clientProfile.portal_access ? 'Yes' : 'No'}`\n  ].join('\\n');\n\n} else {\n  clientStatus  = 'new';\n  identityBlock = [\n    `## Client Identity`,\n    `- Status: NOT FOUND in database (treat as new enquiry)`,\n    `- Name provided: ${prev.sender_name  || 'Not given'}`,\n    `- Email provided: ${prev.sender_email || 'Not given'}`\n  ].join('\\n');\n}\n\nreturn [{\n  json: {\n    ...prev,\n    client_status:  clientStatus,\n    client_profile: clientProfile,\n    identity_block: identityBlock\n  }\n}];"
+      },
+      "id": "5a92af6b-34c2-4308-a850-520c82ffcc22",
+      "name": "Build Identity Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [112, 400]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ `${$json.identity_block}\\n\\n## Enquiry\\nSender: ${$json.sender_name} (${$json.sender_email || 'no email'}) via ${$json.channel}\\n\\nMessage:\\n${$json.message}` }}",
+        "options": {
+          "systemMessage": "You are an expert enquiry classifier and response assistant for a strata management company.\n\nYou have access to a tool called **search_past_enquiries** that reads a Google Sheet containing past classified enquiries. ALWAYS call this tool first before classifying, searching for enquiries similar to the current message. Use the top matches to inform your recommended_action and suggested_response.\n\n## Decision Order (follow strictly)\n\n1. **Call search_past_enquiries** with a short keyword query based on the current message topic (e.g. \"noise complaint neighbour\", \"levy overdue payment\", \"portal login access\"). Review the results.\n\n2. **Check client identity.** The prompt includes a `## Verified Client Profile` or `## Client Identity` section:\n   - Set `client_status`: `\"existing\"`, `\"new\"`, or `\"inactive_former\"`\n   - If `open_requests > 0`, factor into urgency\n   - If `levy_status: \"overdue\"`, flag in `key_details`\n   - If `\"new\"`, category must be `\"New Client Enquiry\"` unless clearly a complaint or generic question\n\n3. **Use past enquiry results.** If the tool returned matching rows:\n   - Use the past RECOMMENDED ACTION as the primary basis for `recommended_action` — adapt to current details\n   - Use the past SUGGESTED RESPONSE as the primary basis for `suggested_response` — personalise to current sender\n   - Set `action_source: \"sheets_kb\"`\n   If no matches found, generate from strata industry first principles and set `action_source: \"ai_reasoning\"`\n\n4. **Classify** using all available context.\n\n---\n\n## Output\n\nReturn ONLY a valid JSON object. No markdown, no explanation, no preamble.\n\n```json\n{\n  \"category\": \"<string>\",\n  \"subcategory\": \"<string>\",\n  \"urgency\": \"<string>\",\n  \"confidence\": <number>,\n  \"client_status\": \"<string>\",\n  \"client_id\": \"<string or null>\",\n  \"summary\": \"<string>\",\n  \"key_details\": [\"<string>\"],\n  \"suggested_response\": \"<string>\",\n  \"recommended_action\": \"<string>\",\n  \"action_source\": \"<string>\",\n  \"routing\": \"<string>\",\n  \"follow_up_questions\": [\"<string>\"]\n}\n```\n\n---\n\n## Field Definitions\n\n### category (pick exactly one)\n- **New Client Enquiry** — Not in database, asking about services, pricing, onboarding, or switching managers\n- **Support Request** — Existing client needing help with portal, documents, levy payments, access\n- **Complaint** — Dissatisfaction, dispute, grievance, noise, neighbour issues, contractor quality, management failure\n- **Maintenance Request** — Broken/damaged common property, urgent or non-urgent repairs\n- **Financial Enquiry** — Levies, invoices, budgets, overdue payments, special levies\n- **Legal or Compliance Enquiry** — By-laws, AGM, legislation, voting, formal notices\n- **General Question** — Anything else\n\n### subcategory — a 2–4 word refinement of the category\n\n### urgency (pick exactly one)\n- **Critical** — Safety risk, legal deadline < 24h, complete service failure\n- **High** — Escalating issue, unresolved dispute, time-sensitive within 1–2 business days\n- **Medium** — Standard SLA, 3–5 business days\n- **Low** — Informational, no immediate impact\n\n**Urgency modifiers from identity:**\n- Existing client with 2+ open_requests → bump up one level\n- Overdue levy in a financial enquiry → bump to High minimum\n- Inactive/former client → keep Medium unless safety involved\n\n### confidence — 0 to 1 (0.9+ clear, 0.5–0.7 ambiguous)\n\n### client_status — `\"existing\"` | `\"new\"` | `\"inactive_former\"`\n\n### client_id — from verified profile, or null if new\n\n### summary — one sentence, max 20 words\n\n### key_details — up to 5 strings: lot numbers, buildings, issues, dates, names from message and profile\n\n### suggested_response — 2–4 sentence professional, empathetic draft reply. Personalise using sender name and lot/building details.\n\n### recommended_action — concrete staff instruction. Name specific steps. Reference lot numbers, buildings, account managers from verified profile.\n\n### action_source — `\"sheets_kb\"` if informed by past enquiries | `\"ai_reasoning\"` if generated from scratch\n\n### routing\n- `\"Account Manager: [name]\"` if client has a known account manager\n- `\"Business Development\"` for new client enquiries\n- `\"Building Manager\"` for on-site maintenance emergencies\n- `\"Strata Committee\"` for legal/compliance matters\n- `\"Finance Team\"` for financial enquiries\n- `\"Director — Urgent\"` for high-severity complaints\n\n### follow_up_questions — up to 3 questions for staff to ask the sender. Empty array if not needed.\n\n---\n\n## Rules\n- Return ONLY the JSON object\n- Never fabricate lot numbers, amounts, or names not in the prompt\n- If sender is distressed or angry, bump urgency one level and make suggested_response especially empathetic\n- If client is new, recommended_action must include assigning to Business Development"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [336, 400],
+      "id": "32dcbf13-ff1e-46b4-9251-4e3e77ef5a7d",
+      "name": "AI Classification Agent",
+      "notes": "Agent has two sub-nodes: Gemini Chat Model (language model) and Google Sheets Tool (knowledge base). The agent calls the Sheets tool autonomously to look up similar past enquiries before classifying."
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [240, 576],
+      "id": "60f4d27a-c2c6-46bf-a918-3b3be52b1a82",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "E3fNoS2yxEwmWSry",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "search_past_enquiries",
+        "description": "Search the past enquiries knowledge base (Google Sheet) for similar cases. Pass a short keyword query (e.g. 'noise complaint neighbour', 'levy overdue', 'portal login'). Returns matching rows with category, urgency, original_message, recommended_action, and suggested_response. Always call this before classifying an enquiry.",
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env[\"PAST_ENQUIRIES_SHEET_ID\"]}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "past_enquiries",
+          "mode": "name"
+        },
+        "filtersUI": {},
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Tool: Search Past Enquiries (Sheets)",
+      "type": "@n8n/n8n-nodes-langchain.toolGoogleSheets",
+      "typeVersion": 1,
+      "position": [432, 576],
+      "notes": "Set PAST_ENQUIRIES_SHEET_ID as an environment variable (the Google Sheet ID from the URL). Sheet must have a tab named 'past_enquiries' with columns: category, subcategory, urgency, client_status, original_message, recommended_action, suggested_response, processed_at.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst outputs = [];\n\nfor (const item of items) {\n  try {\n    let aiResponse = item.json.response || item.json.output || item.json.text || '';\n\n    // Strip code fences\n    aiResponse = aiResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n\n    // Extract JSON block if wrapped in extra text\n    const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) aiResponse = jsonMatch[0];\n\n    const parsed = JSON.parse(aiResponse);\n\n    // Required fields check\n    const required = ['category', 'urgency', 'confidence', 'client_status', 'summary', 'suggested_response', 'recommended_action', 'action_source'];\n    const missing = required.filter(f => !parsed[f]);\n    if (missing.length > 0) throw new Error(`Missing fields: ${missing.join(', ')}`);\n\n    // Normalise optional fields\n    parsed.subcategory         = parsed.subcategory || '';\n    parsed.client_id           = parsed.client_id   || null;\n    parsed.key_details         = parsed.key_details         || [];\n    parsed.follow_up_questions = parsed.follow_up_questions || [];\n    parsed.routing             = parsed.routing             || 'General Queue';\n\n    // Pull identity metadata from Build Identity Context\n    const prev = $('Build Identity Context').first().json;\n\n    outputs.push({\n      json: {\n        success: true,\n        data: parsed,\n        meta: {\n          original_message: prev.message        || '',\n          sender_name:      prev.sender_name    || '',\n          sender_email:     prev.sender_email   || '',\n          channel:          prev.channel        || 'web',\n          client_profile:   prev.client_profile || {},\n          processed_at:     new Date().toISOString()\n        }\n      }\n    });\n\n  } catch (error) {\n    const prev = $('Build Identity Context').first().json;\n    outputs.push({\n      json: {\n        success: false,\n        error: error.message,\n        data: {\n          category:            'General Question',\n          subcategory:         '',\n          urgency:             'Medium',\n          confidence:          0,\n          client_status:       prev.client_status          || 'unknown',\n          client_id:           prev.client_profile?.client_id || null,\n          summary:             'Classification failed — manual review required',\n          key_details:         [],\n          suggested_response:  'Thank you for your enquiry. A member of our team will be in touch shortly.',\n          recommended_action:  'Manual review required — AI classification failed. Assign to senior staff.',\n          action_source:       'fallback',\n          routing:             'General Queue',\n          follow_up_questions: []\n        },\n        meta: {\n          original_message: prev.message    || '',\n          processed_at:     new Date().toISOString()\n        }\n      }\n    });\n  }\n}\n\nreturn outputs;"
+      },
+      "id": "866c5768-d46a-451c-b953-ef7240ed8463",
+      "name": "Parse & Validate Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [560, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.success}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "61382a55-daff-4b44-97de-65f42e78446d",
+      "name": "Classification Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [784, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{$env[\"PAST_ENQUIRIES_SHEET_ID\"]}}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "past_enquiries",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "category":           "={{$json.data.category}}",
+            "subcategory":        "={{$json.data.subcategory}}",
+            "urgency":            "={{$json.data.urgency}}",
+            "client_status":      "={{$json.data.client_status}}",
+            "action_source":      "={{$json.data.action_source}}",
+            "channel":            "={{$json.meta.channel}}",
+            "original_message":   "={{$json.meta.original_message}}",
+            "recommended_action": "={{$json.data.recommended_action}}",
+            "suggested_response": "={{$json.data.suggested_response}}",
+            "processed_at":       "={{$json.meta.processed_at}}"
+          }
+        },
+        "options": {}
+      },
+      "id": "e700c7c7-af9b-4fee-a192-887bed85fe83",
+      "name": "Log to Sheets: Append New Enquiry",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1008, 288],
+      "notes": "Appends the classified enquiry to the same Google Sheet used as the knowledge base. This keeps the knowledge base growing automatically — no separate RAG insert step needed. Uses the same PAST_ENQUIRIES_SHEET_ID environment variable.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      },
+      "id": "2b4c29bd-895c-47e4-bf33-f6c33cdc238d",
+      "name": "Return Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1232, 288]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      },
+      "id": "fda711f3-d889-41aa-bcd5-0b74e0afcb82",
+      "name": "Return Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1008, 512]
+    }
+  ],
+  "pinData": {
+    "Webhook Trigger": [
+      {
+        "json": {
+          "message": "Hi, I've been getting noise complaints from the unit above me every night after 10pm. This has been going on for 3 weeks. My lot is 14 at 22 Harbour Street.",
+          "sender_name": "Maria Santos",
+          "sender_email": "maria.santos@email.com",
+          "sender_phone": "+61 412 001 001",
+          "channel": "web"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Set Input", "type": "main", "index": 0 }]]
+    },
+    "Set Input": {
+      "main": [[{ "node": "MCP: Verify Client Identity", "type": "main", "index": 0 }]]
+    },
+    "MCP: Verify Client Identity": {
+      "main": [[{ "node": "Build Identity Context", "type": "main", "index": 0 }]]
+    },
+    "Build Identity Context": {
+      "main": [[{ "node": "AI Classification Agent", "type": "main", "index": 0 }]]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Classification Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Tool: Search Past Enquiries (Sheets)": {
+      "ai_tool": [[{ "node": "AI Classification Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "AI Classification Agent": {
+      "main": [[{ "node": "Parse & Validate Response", "type": "main", "index": 0 }]]
+    },
+    "Parse & Validate Response": {
+      "main": [[{ "node": "Classification Successful?", "type": "main", "index": 0 }]]
+    },
+    "Classification Successful?": {
+      "main": [
+        [{ "node": "Log to Sheets: Append New Enquiry", "type": "main", "index": 0 }],
+        [{ "node": "Return Error Response",             "type": "main", "index": 0 }]
+      ]
+    },
+    "Log to Sheets: Append New Enquiry": {
+      "main": [[{ "node": "Return Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a1b2c3d4-5678-90ab-cdef-111213141516",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "0314d0f6127572145f4965281ecd4b70cdd9d7a24534eed696081db43f3421b6",
+    "notes": "Simplified architecture: Pinecone vector store + embeddings replaced by a Google Sheets tool attached directly to the AI Agent. The agent calls the Sheets tool autonomously to look up similar past enquiries. New enquiries are appended to the same sheet after successful classification, keeping the knowledge base growing. Required env vars: MCP_SERVER_URL, MCP_API_KEY, PAST_ENQUIRIES_SHEET_ID. Required credentials: Google Gemini API, Google Sheets OAuth2, Google Sheets OAuth2 (same credential used for both tool and log nodes). Sheet setup: create a Google Sheet with a tab named 'past_enquiries' and columns: category | subcategory | urgency | client_status | action_source | channel | original_message | recommended_action | suggested_response | processed_at"
+  },
+  "id": "9X0KzDvmxbxGuaNz",
+  "tags": []
+}
