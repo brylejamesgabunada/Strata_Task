@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Strata Enquiry Desk</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Strata Enquiry Desk</h1>
+        <p>Strata consultancy operations</p>
+      </div>
+      <div class="health-pill" id="healthPill">Checking service</div>
+    </header>
+
+    <main class="app-shell">
+      <section class="form-panel" aria-labelledby="formTitle">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Form trigger</p>
+            <h2 id="formTitle">Client enquiry</h2>
+          </div>
+          <button class="ghost-button" type="button" id="demoButton">Demo input</button>
+        </div>
+
+        <form id="enquiryForm" class="enquiry-form">
+          <label>
+            <span>Email Address</span>
+            <input name="client_email" type="email" autocomplete="email" required>
+          </label>
+
+          <label>
+            <span>Name</span>
+            <input name="client_name" type="text" autocomplete="name" required>
+          </label>
+
+          <label>
+            <span>Building Name</span>
+            <input name="building_name" type="text" autocomplete="organization">
+          </label>
+
+          <label>
+            <span>Building Size (units)</span>
+            <input name="building_size" type="number" min="0" step="1">
+          </label>
+
+          <label class="wide">
+            <span>Your Message</span>
+            <textarea name="message" rows="7" required></textarea>
+          </label>
+
+          <div class="form-actions">
+            <button class="primary-button" type="submit" id="submitButton">Analyse enquiry</button>
+            <p id="formStatus" class="form-status" role="status"></p>
+          </div>
+        </form>
+      </section>
+
+      <section class="dashboard-panel" aria-labelledby="dashboardTitle">
+        <div class="panel-header dashboard-heading">
+          <div>
+            <p class="eyebrow">Staff dashboard</p>
+            <h2 id="dashboardTitle">Review queue</h2>
+          </div>
+          <button class="ghost-button" type="button" id="refreshButton">Refresh</button>
+        </div>
+
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="filters">
+          <label>
+            <span>Status</span>
+            <select id="statusFilter">
+              <option value="all">All</option>
+              <option value="ESCALATED">Escalated</option>
+              <option value="PROCESSED">Processed</option>
+              <option value="IN_REVIEW">In review</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+          </label>
+          <label>
+            <span>Category</span>
+            <select id="categoryFilter">
+              <option value="all">All</option>
+              <option value="New Client">New Client</option>
+              <option value="Support Request">Support Request</option>
+              <option value="Complaint">Complaint</option>
+              <option value="General Question">General Question</option>
+            </select>
+          </label>
+          <label class="search-field">
+            <span>Search</span>
+            <input id="searchFilter" type="search" placeholder="Name, email, summary">
+          </label>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="queue-list" id="queueList"></div>
+          <aside class="detail-panel" id="detailPanel"></aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

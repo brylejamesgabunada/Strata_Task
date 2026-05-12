@@ -1,0 +1,486 @@
+{
+  "name": "Enquiry Classifier & Response Generator - n8n Cloud Mock",
+  "nodes": [
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 1000,
+          "temperature": 0.2
+        }
+      },
+      "id": "51f8e3f1-8211-49fd-b65d-eea23966da05",
+      "name": "OpenAI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1144,
+        624
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ZmQjj6SbWmNScPZ4",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{ \"client_type\": \"Existing Client\", \"category\": \"Complaint\", \"urgency\": \"High\", \"confidence\": 93, \"summary\": \"Existing client reports dissatisfaction with current strata transition delays.\", \"recommended_actions\": [\"Escalate to senior consultant\", \"Schedule follow-up meeting\", \"Review transition timeline\"], \"historical_reference\": { \"similar_case_id\": 1001, \"previous_resolution\": \"Transition consultation completed successfully\" }, \"suggested_response\": \"Thank you for reaching out regarding your concerns...\", \"requires_human_review\": false }"
+      },
+      "id": "ac8e10cd-9edc-4178-8f3c-3e5ada3185d7",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1272,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Strata Consultancy Inquiry",
+        "formDescription": "Submit your inquiry and our team will respond promptly.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email",
+              "fieldName": "client_email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Name",
+              "fieldName": "client_name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Building Name",
+              "fieldName": "building_name"
+            },
+            {
+              "fieldLabel": "Building Size (units)",
+              "fieldType": "number",
+              "fieldName": "building_size"
+            },
+            {
+              "fieldLabel": "Your Message",
+              "fieldType": "textarea",
+              "fieldName": "message",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Thank you for your inquiry! Our team will review your message and respond shortly."
+            }
+          }
+        }
+      },
+      "id": "9f7e1bd5-a5fd-4e1d-8b21-616b4b61d0ba",
+      "name": "Strata Inquiry Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        400
+      ],
+      "webhookId": "1998d902-6ef9-4e44-8420-a4a6f22b46ce"
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $(\"Strata Inquiry Form\").item.json;\nconst email = String(form.client_email || \"\").trim().toLowerCase();\n\nconst clients = [\n  {\n    client_id: \"CLT-0001\",\n    full_name: \"Maria Santos\",\n    email: \"maria.santos@email.com\",\n    status: \"active\",\n    lots: [\n      {\n        lot_number: \"14\",\n        building: \"22 Harbour Street, Pyrmont NSW 2009\",\n        plan_number: \"SP12345\",\n        role: \"owner\"\n      }\n    ],\n    account_manager: \"James Reyes\",\n    portal_access: true,\n    open_requests: 1,\n    levy_status: \"current\"\n  },\n  {\n    client_id: \"CLT-0002\",\n    full_name: \"David Nguyen\",\n    email: \"d.nguyen@outlook.com\",\n    status: \"active\",\n    lots: [\n      {\n        lot_number: \"7\",\n        building: \"10 Marina Cove, Pyrmont NSW 2009\",\n        plan_number: \"SP54321\",\n        role: \"owner\"\n      }\n    ],\n    account_manager: \"Sarah Kim\",\n    portal_access: true,\n    open_requests: 0,\n    levy_status: \"overdue\"\n  },\n  {\n    client_id: \"CLT-0003\",\n    full_name: \"Elena Reyes\",\n    email: \"elena.reyes@gmail.com\",\n    status: \"active\",\n    lots: [\n      {\n        lot_number: \"22\",\n        building: \"55 Park Avenue, Chippendale NSW 2008\",\n        plan_number: \"SP98765\",\n        role: \"owner\"\n      }\n    ],\n    account_manager: \"James Reyes\",\n    portal_access: false,\n    open_requests: 0,\n    levy_status: \"current\"\n  }\n];\n\nconst client = clients.find((record) => String(record.email).toLowerCase() === email);\n\nif (!client || client.status !== \"active\") {\n  return [\n    {\n      json: {\n        client_exists: false,\n        client_id: null,\n        client_type: \"New\",\n        assigned_consultant: \"Business Development\",\n        past_inquiries_count: 0,\n        active_projects: [],\n        open_requests: 0,\n        levy_status: \"n/a\",\n        portal_access: false,\n        lots: [],\n        profile: null\n      }\n    }\n  ];\n}\n\nreturn [\n  {\n    json: {\n      client_exists: true,\n      client_id: client.client_id,\n      client_type: \"Existing\",\n      assigned_consultant: client.account_manager || \"Unassigned\",\n      past_inquiries_count: client.open_requests || 0,\n      active_projects: client.open_requests > 0 ? [\"Open enquiry follow-up\"] : [],\n      open_requests: client.open_requests || 0,\n      levy_status: client.levy_status || \"unknown\",\n      portal_access: Boolean(client.portal_access),\n      lots: client.lots || [],\n      profile: client\n    }\n  }\n];"
+      },
+      "id": "0863e4aa-b157-42f1-9960-ee3ec175f819",
+      "name": "Lookup Client Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $(\"Strata Inquiry Form\").item.json;\nconst message = String(form.message || \"\").toLowerCase();\n\nconst cases = [\n  {\n    inquiry_id: \"enq-001\",\n    category: \"Complaint\",\n    subcategory: \"Noise Dispute\",\n    urgency: \"High\",\n    client_status: \"existing\",\n    summary: \"Owner in Lot 14 reporting persistent late-night noise from upstairs neighbour.\",\n    original_message: \"Noise complaints from the unit above every night after 10pm.\",\n    recommended_action: \"Issue formal noise by-law breach notice to Lot 15. Log the complaint in the dispute register. Follow up with both parties within 48 hours. If repeated, escalate to NCAT mediation referral.\",\n    previous_resolution: \"By-law notice issued and resolved within 7 days.\",\n    suggested_response: \"Thank you for raising this concern. We take noise complaints very seriously and have logged your report. We will issue a formal notice and follow up with you within 48 hours.\"\n  },\n  {\n    inquiry_id: \"enq-004\",\n    category: \"New Client Enquiry\",\n    subcategory: \"Switching Managers\",\n    urgency: \"Low\",\n    client_status: \"new\",\n    summary: \"Committee chairperson exploring switching strata managers for a 48-lot building.\",\n    original_message: \"Looking to change strata managers before current contract renewal.\",\n    recommended_action: \"Assign to Business Development. Send the new client information pack and fee proposal template. Schedule a discovery call within 2 business days. Request the current management agreement and financial statements.\",\n    previous_resolution: \"Discovery call booked and proposal sent.\",\n    suggested_response: \"Thank you for reaching out. We would be happy to learn more about your building and arrange a no-obligation consultation.\"\n  },\n  {\n    inquiry_id: \"enq-006\",\n    category: \"Support Request\",\n    subcategory: \"Portal Access\",\n    urgency: \"Low\",\n    client_status: \"existing\",\n    summary: \"New owner cannot log in to the owner portal after purchase.\",\n    original_message: \"Recently purchased a lot and have not received portal login details.\",\n    recommended_action: \"Verify the ownership transfer. Create or reactivate the portal account. Send login credentials, portal guide, levy schedule, and by-laws within 1 business day.\",\n    previous_resolution: \"Account created and welcome email sent same day.\",\n    suggested_response: \"Welcome to the building. We will verify your ownership details and arrange your portal access as soon as possible.\"\n  },\n  {\n    inquiry_id: \"enq-007\",\n    category: \"Complaint\",\n    subcategory: \"Management Dissatisfaction\",\n    urgency: \"High\",\n    client_status: \"existing\",\n    summary: \"Committee member complains that maintenance requests and emails are not being actioned.\",\n    original_message: \"Three maintenance issues not actioned and emails take weeks to get a response.\",\n    recommended_action: \"Escalate immediately to the Portfolio Manager or Director. Pull the open maintenance request log. Assign each overdue item to a contractor with a deadline. Provide a written service recovery plan within 24 hours.\",\n    previous_resolution: \"Director call made, all items resolved within 5 days, client retained.\",\n    suggested_response: \"I sincerely apologise for the experience you have had. We have escalated this for immediate review and will provide a written action plan.\"\n  }\n];\n\nfunction score(record) {\n  const text = [\n    record.category,\n    record.subcategory,\n    record.summary,\n    record.original_message,\n    record.recommended_action\n  ].join(\" \").toLowerCase();\n\n  let value = 0;\n  for (const token of message.split(/[^a-z0-9]+/).filter((word) => word.length > 2)) {\n    if (text.includes(token)) value += 1;\n  }\n\n  if (/noise|loud|neighbour|neighbor/.test(message) && record.subcategory === \"Noise Dispute\") value += 10;\n  if (/switch|change|manager|proposal|contract/.test(message) && record.category === \"New Client Enquiry\") value += 10;\n  if (/portal|login|access/.test(message) && record.subcategory === \"Portal Access\") value += 10;\n  if (/unhappy|unacceptable|ignored|complaint|nothing has been done/.test(message) && record.category === \"Complaint\") value += 8;\n\n  return value;\n}\n\nreturn [\n  {\n    json: {\n      similar_cases: cases\n        .map((record) => ({ ...record, score: score(record) }))\n        .sort((a, b) => b.score - a.score)\n        .slice(0, 3)\n    }\n  }\n];"
+      },
+      "id": "5ca3c3c4-9d55-4300-a0a1-9b5ad8a79a7c",
+      "name": "Retrieve Similar Cases (RAG)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "inquiry_message",
+              "value": "={{ $(\"Strata Inquiry Form\").item.json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "client_email",
+              "value": "={{ $(\"Strata Inquiry Form\").item.json.client_email }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "client_name",
+              "value": "={{ $(\"Strata Inquiry Form\").item.json.client_name }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "building_name",
+              "value": "={{ $(\"Strata Inquiry Form\").item.json.building_name }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "building_size",
+              "value": "={{ $(\"Strata Inquiry Form\").item.json.building_size }}",
+              "type": "number"
+            },
+            {
+              "id": "6",
+              "name": "client_context",
+              "value": "={{ $(\"Lookup Client Context\").item.json }}",
+              "type": "object"
+            },
+            {
+              "id": "7",
+              "name": "similar_cases",
+              "value": "={{ $(\"Retrieve Similar Cases (RAG)\").item.json.similar_cases }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "77004425-b155-480e-b494-8458d868f18d",
+      "name": "Prepare AI Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=CURRENT INQUIRY:\nClient: {{ $json.client_name }} ({{ $json.client_email }})\nBuilding: {{ $json.building_name }} ({{ $json.building_size }} units)\nMessage: {{ $json.inquiry_message }}\n\nCLIENT CONTEXT:\n{{ JSON.stringify($json.client_context, null, 2) }}\n\nSIMILAR PAST INQUIRIES (RAG):\n{{ JSON.stringify($json.similar_cases, null, 2) }}\n\nINSTRUCTIONS:\nAnalyze this strata consultancy inquiry and provide a structured response.\n\nClassification Rules:\n- \"New Client\" if client_context.client_exists is false\n- \"Support Request\" if existing client with active projects\n- \"Complaint\" if negative sentiment detected (dissatisfaction, unhappy, issues, problems)\n- \"General Question\" for informational inquiries\n\nUrgency Levels:\n- \"High\" for complaints, urgent issues, or time-sensitive matters\n- \"Medium\" for support requests from existing clients\n- \"Low\" for general questions or new client inquiries\n\nReturn a JSON object with:\n- client_type: \"New Client\" or \"Existing Client\"\n- category: classification from rules above\n- urgency: \"High\", \"Medium\", or \"Low\"\n- confidence: 0-100 (your confidence in the classification)\n- summary: brief 1-sentence summary of the inquiry\n- recommended_actions: array of 2-4 specific action items for staff\n- historical_reference: { similar_case_id, previous_resolution } from RAG data if relevant\n- suggested_response: professional response draft for the client (2-3 paragraphs)\n- requires_human_review: true if confidence < 70 or urgency is High",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an AI operations assistant for a strata consultancy. Analyze inquiries using client context and historical data to classify, prioritize, and recommend actions. Be professional, empathetic, and leverage past successful resolutions."
+        }
+      },
+      "id": "ef8b4d2c-000b-4425-852a-1f9f7db884e6",
+      "name": "Classify & Analyze Inquiry",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1136,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "1",
+              "leftValue": "={{ $json.output.urgency }}",
+              "rightValue": "High",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "2",
+              "leftValue": "={{ $json.output.requires_human_review }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e071a318-dfd6-41b7-acc7-0ddca50ee7ea",
+      "name": "Check Urgency",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1488,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "status",
+              "value": "ESCALATED",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "notification",
+              "value": "={{ \"🚨 HIGH PRIORITY: \" + $json.output.category + \" from \" + $(\"Prepare AI Context\").item.json.client_name }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "assigned_to",
+              "value": "={{ $(\"Prepare AI Context\").item.json.client_context.assigned_consultant ?? \"Unassigned\" }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "analysis",
+              "value": "={{ $json.output }}",
+              "type": "object"
+            },
+            {
+              "id": "5",
+              "name": "client_info",
+              "value": "={{ $(\"Prepare AI Context\").item.json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ce86909-438a-45fa-989e-4143b61aad63",
+      "name": "Escalate to Human Review",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "status",
+              "value": "PROCESSED",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "notification",
+              "value": "={{ \"✅ \" + $json.output.category + \" from \" + $(\"Prepare AI Context\").item.json.client_name + \" - Auto-processed\" }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "analysis",
+              "value": "={{ $json.output }}",
+              "type": "object"
+            },
+            {
+              "id": "4",
+              "name": "client_info",
+              "value": "={{ $(\"Prepare AI Context\").item.json }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "db47a74f-2dd2-4fba-99db-3bfab1144ce7",
+      "name": "Standard Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1712,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🎯 Workflow Overview\n\nThis workflow demonstrates enterprise-grade inquiry triage with:\n\n**1. Form Capture** - Collect client details\n**2. Client Lookup** - Retrieve ownership & history\n**3. RAG Retrieval** - Find similar past cases\n**4. AI Analysis** - Context-aware classification\n**5. Smart Routing** - Escalate or auto-process\n\n**Key Features:**\n• Email-based client identification\n• Historical case similarity matching\n• Sentiment-based urgency detection\n• Automated response generation\n• Human review for high-priority cases",
+        "height": 280,
+        "width": 320,
+        "color": 4
+      },
+      "id": "5825a353-c655-4b31-9eec-d5ccc1b21380",
+      "name": "Workflow Guide",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## n8n Cloud Demo Configuration\n\nThis version does not call external backend endpoints.\n\nThe original HTTP Request nodes have been replaced with Code nodes:\n\n1. Lookup Client Context uses static demo client records.\n2. Retrieve Similar Cases (RAG) uses static past enquiry records.\n\nThis is suitable for n8n Cloud because localhost and host.docker.internal are not reachable from n8n Cloud.\n\nFor production, replace these Code nodes with public HTTPS endpoints or a real database/RAG service.",
+        "height": 360,
+        "width": 520,
+        "color": 5
+      },
+      "id": "5a8cec2c-4cbe-4118-b2de-79546fdd7f1a",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 AI Model Settings\n\n**Current Configuration:**\n• Model: gpt-4o-mini\n• Temperature: 0.2 (low for consistent classification)\n• Max Tokens: 1000\n\n**Why Low Temperature?**\nFor triage/classification tasks, we want deterministic, consistent results. Temperature 0.2 ensures the AI follows classification rules strictly.\n\n**Adjust in:** OpenAI Model node → Options → Temperature",
+        "height": 240,
+        "width": 320,
+        "color": 2
+      },
+      "id": "1c87e41f-3c8a-49ac-8347-674451b03c31",
+      "name": "AI Configuration",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        800,
+        896
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify & Analyze Inquiry",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classify & Analyze Inquiry",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strata Inquiry Form": {
+      "main": [
+        [
+          {
+            "node": "Lookup Client Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Client Context": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Similar Cases (RAG)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Similar Cases (RAG)": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Context": {
+      "main": [
+        [
+          {
+            "node": "Classify & Analyze Inquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify & Analyze Inquiry": {
+      "main": [
+        [
+          {
+            "node": "Check Urgency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Urgency": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Human Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Standard Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "instanceId": "ec3b3be42921bc408f65d871f0fb08b65e699857bb1bef89d686a642b4c56ef9"
+  },
+  "tags": []
+}
