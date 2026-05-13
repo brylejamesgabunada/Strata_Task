@@ -5,7 +5,7 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const sourcePath = path.join(os.homedir(), "Downloads", "Enquiry Classifier & Response Generator.json");
 const outputPath = path.join(root, "Enquiry Classifier & Response Generator - Webhook UI.json");
-const backendBaseUrl = (process.env.BACKEND_BASE_URL || "https://e293-103-43-214-18.ngrok-free.app").replace(/\/$/, "");
+const backendBaseUrl = (process.env.BACKEND_BASE_URL || "https://8137-103-43-214-18.ngrok-free.app").replace(/\/$/, "");
 
 const workflow = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
 
@@ -146,7 +146,7 @@ workflow.nodes.push({
       "Use this workflow when the client form is your own web UI.",
       "",
       "Production webhook URL after activation:",
-      "`https://gabunadame.app.n8n.cloud/webhook/strata-enquiry`",
+      "`https://gabunadame.app.n8n.cloud/webhook-test/strata-enquiry`",
       "",
       "Local backend/RAG URL configured in HTTP nodes:",
       `\`${backendBaseUrl}\``

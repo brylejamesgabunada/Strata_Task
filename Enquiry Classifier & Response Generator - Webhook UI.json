@@ -3,6 +3,54 @@
   "nodes": [
     {
       "parameters": {
+        "content": "## Configuration Required\n\n**Backend API Endpoints:**\n1. Client Lookup: `GET /api/client/context?email=...`\n2. RAG Search fallback: `POST /api/rag/search`\n\n**Google Sheets Knowledge Base:**\nUpload `data/strata_knowledge_base_google_sheet.csv` to Google Sheets, name the tab `KnowledgeBase`, then configure the `Knowledge Base Sheet Tool` node with your Google OAuth credential, document, and sheet.\n\n**Negative-case handling:**\n- Client not found continues as `New Client`.\n- Client lookup HTML/error responses are treated as unavailable context, not as the enquiry.\n- Empty RAG results become an empty array.\n- The AI prompt must analyze only the submitted client message.",
+        "height": 420,
+        "width": 560,
+        "color": 5
+      },
+      "id": "5a8cec2c-4cbe-4118-b2de-79546fdd7f1a",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 AI Model Settings\n\n**Current Configuration:**\n• Model: gpt-4o-mini\n• Temperature: 0.2 (low for consistent classification)\n• Max Tokens: 1200\n\n**Why Low Temperature?**\nFor triage/classification tasks, we want deterministic, consistent results. Temperature 0.2 ensures the AI follows classification rules strictly.\n\n**Adjust in:** OpenAI Model node → Options → Temperature",
+        "height": 240,
+        "width": 320,
+        "color": 2
+      },
+      "id": "1c87e41f-3c8a-49ac-8347-674451b03c31",
+      "name": "AI Configuration",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Custom UI Webhook\n\nUse this workflow when the client form is your Laravel/custom web UI.\n\nProduction webhook URL after activation:\n`https://gabunadame.app.n8n.cloud/webhook-test/strata-enquiry`\n\nLaravel backend/RAG URL configured in HTTP nodes:\n`https://8137-103-43-214-18.ngrok-free.app`\n\nExpected client payload:\n`client_name`, `client_email`, `building_name`, `building_size`, `message`\n\nIf ngrok restarts, update the two HTTP Request node URLs before testing. The Google Sheets tool must also be configured manually in n8n with your sheet credential.",
+        "height": 340,
+        "width": 520,
+        "color": 3
+      },
+      "id": "e899f393-712c-486d-ba58-619b0e63035f",
+      "name": "Custom UI Webhook Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        -16
+      ]
+    },
+    {
+      "parameters": {
         "model": {
           "__rl": true,
           "mode": "list",
@@ -10,17 +58,17 @@
         },
         "builtInTools": {},
         "options": {
-          "maxTokens": 1000,
+          "maxTokens": 1200,
           "temperature": 0.2
         }
       },
-      "id": "51f8e3f1-8211-49fd-b65d-eea23966da05",
-      "name": "OpenAI Model",
+      "id": "73915925-8be0-4f00-9bbf-944dafd83753",
+      "name": "OpenAI Model1",
       "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
       "typeVersion": 1.3,
       "position": [
-        1144,
-        624
+        1104,
+        512
       ],
       "credentials": {
         "openAiApi": {
@@ -31,44 +79,47 @@
     },
     {
       "parameters": {
-        "jsonSchemaExample": "{ \"client_type\": \"Existing Client\", \"category\": \"Complaint\", \"urgency\": \"High\", \"confidence\": 93, \"summary\": \"Existing client reports dissatisfaction with current strata transition delays.\", \"recommended_actions\": [\"Escalate to senior consultant\", \"Schedule follow-up meeting\", \"Review transition timeline\"], \"historical_reference\": { \"similar_case_id\": 1001, \"previous_resolution\": \"Transition consultation completed successfully\" }, \"suggested_response\": \"Thank you for reaching out regarding your concerns...\", \"requires_human_review\": false }"
+        "jsonSchemaExample": "{\"client_type\":\"Existing Client\",\"category\":\"Complaint\",\"urgency\":\"High\",\"confidence\":92,\"summary\":\"Existing client reports repeated after-hours noise from a neighbouring lot and wants the matter actioned.\",\"recommended_actions\":[\"Log the complaint against the relevant lot and attach the owner supplied details.\",\"Check the scheme by-laws and previous correspondence for this building.\",\"Send an acknowledgement to the client and advise the next review timeframe.\"],\"historical_reference\":{\"similar_case_id\":\"enq-001\",\"previous_resolution\":\"by-law notice issued, resolved within 7 days\"},\"suggested_response\":\"Dear Maria,\\n\\nThank you for letting us know about the repeated noise issue. We have logged this as a strata complaint and will review the relevant by-laws and any prior correspondence for your building.\\n\\nWe will update you once the next action has been confirmed. Please keep a note of any further incidents, including dates and times, so we can include them in the record.\\n\\nBest regards,\\nStrata Support Team\",\"requires_human_review\":true}"
       },
-      "id": "ac8e10cd-9edc-4178-8f3c-3e5ada3185d7",
-      "name": "Structured Output Parser",
+      "id": "a7f04a56-f25b-4b52-ac49-89d58d4b61b9",
+      "name": "Structured Output Parser1",
       "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
       "typeVersion": 1.3,
       "position": [
-        1272,
-        624
+        1232,
+        512
       ]
     },
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "strata-enquiry",
-        "responseMode": "onReceived",
-        "responseData": "firstEntryJson",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "id": "9f7e1bd5-a5fd-4e1d-8b21-616b4b61d0ba",
-      "name": "Custom UI Webhook",
+      "id": "59e1f78b-fdca-4411-b7b8-0c75ee0a9853",
+      "name": "Strata Inquiry Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        240,
-        400
+        192,
+        288
       ],
       "webhookId": "strata-enquiry-custom-ui"
     },
     {
       "parameters": {
-        "url": "={{ \"https://e293-103-43-214-18.ngrok-free.app/api/client/context?email=\" + $json.client_email }}",
+        "url": "={{ \"https://8137-103-43-214-18.ngrok-free.app/api/client/context?email=\" + encodeURIComponent($json.client_email || \"\") }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "ngrok-skip-browser-warning",
               "value": "true"
+            },
+            {
+              "name": "accept",
+              "value": "application/json"
             }
           ]
         },
@@ -80,32 +131,36 @@
           }
         }
       },
-      "id": "0863e4aa-b157-42f1-9960-ee3ec175f819",
-      "name": "Lookup Client Context",
+      "id": "baecb3f4-5f20-4488-9fb8-df8b7f858021",
+      "name": "Lookup Client Context1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        464,
-        400
+        640,
+        288
       ],
       "alwaysOutputData": true
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://e293-103-43-214-18.ngrok-free.app/api/rag/search",
+        "url": "https://8137-103-43-214-18.ngrok-free.app/api/rag/search",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "ngrok-skip-browser-warning",
               "value": "true"
+            },
+            {
+              "name": "accept",
+              "value": "application/json"
             }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"query\": $(\"Strata Inquiry Form\").item.json.message, \"limit\": 3 } }}",
+        "jsonBody": "={{ { \"query\": $(\"Normalize Client Input\").item.json.message, \"limit\": 3 } }}",
         "options": {
           "response": {
             "response": {
@@ -114,13 +169,13 @@
           }
         }
       },
-      "id": "5ca3c3c4-9d55-4300-a0a1-9b5ad8a79a7c",
-      "name": "Retrieve Similar Cases (RAG)",
+      "id": "c7b9d13b-4220-4ffb-be5c-4a99114d5d03",
+      "name": "Retrieve Similar Cases (RAG)1",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        688,
-        400
+        864,
+        288
       ],
       "alwaysOutputData": true
     },
@@ -131,85 +186,102 @@
             {
               "id": "1",
               "name": "inquiry_message",
-              "value": "={{ $(\"Strata Inquiry Form\").item.json.message }}",
+              "value": "={{ $(\"Normalize Client Input\").item.json.message }}",
               "type": "string"
             },
             {
               "id": "2",
               "name": "client_email",
-              "value": "={{ $(\"Strata Inquiry Form\").item.json.client_email }}",
+              "value": "={{ $(\"Normalize Client Input\").item.json.client_email }}",
               "type": "string"
             },
             {
               "id": "3",
               "name": "client_name",
-              "value": "={{ $(\"Strata Inquiry Form\").item.json.client_name }}",
+              "value": "={{ $(\"Normalize Client Input\").item.json.client_name }}",
               "type": "string"
             },
             {
               "id": "4",
               "name": "building_name",
-              "value": "={{ $(\"Strata Inquiry Form\").item.json.building_name }}",
+              "value": "={{ $(\"Normalize Client Input\").item.json.building_name }}",
               "type": "string"
             },
             {
               "id": "5",
               "name": "building_size",
-              "value": "={{ $(\"Strata Inquiry Form\").item.json.building_size }}",
+              "value": "={{ $(\"Normalize Client Input\").item.json.building_size }}",
               "type": "number"
             },
             {
               "id": "6",
               "name": "client_context",
-              "value": "={{ $(\"Lookup Client Context\").item.json }}",
+              "value": "={{ (() => { const fallback = { client_exists: false, client_id: null, client_type: \"New\", assigned_consultant: \"Business Development\", past_inquiries_count: 0, active_projects: [], open_requests: 0, levy_status: \"n/a\", portal_access: false, lots: [], profile: null, lookup_status: \"not_found\", lookup_note: \"No matching client found; continue as a new client enquiry.\" }; const ctx = $(\"Lookup Client Context1\").item.json ?? {}; const data = ctx.data; const text = typeof data === \"string\" ? data.toLowerCase() : \"\"; const status = Number(ctx.statusCode ?? ctx.status ?? 0); const badResponse = Boolean(ctx.error) || status >= 400 || text.includes(\"<!doctype html\") || text.includes(\"ngrok\") || (text.includes(\"endpoint\") && text.includes(\"offline\")); if (badResponse) return { ...fallback, lookup_status: \"unavailable\", lookup_error: \"Client lookup returned an error or non-client response; do not analyse that response as the enquiry.\" }; if (ctx.client_exists === false || (!ctx.client_id && (ctx.client_type === \"New\" || ctx.client_type === undefined))) return { ...fallback, ...ctx, client_exists: false, client_type: \"New\", assigned_consultant: ctx.assigned_consultant ?? \"Business Development\", lookup_status: \"not_found\" }; return { ...ctx, lookup_status: \"found\" }; })() }}",
               "type": "object"
             },
             {
               "id": "7",
               "name": "similar_cases",
-              "value": "={{ $(\"Retrieve Similar Cases (RAG)\").item.json.similar_cases }}",
+              "value": "={{ (() => { const rag = $(\"Retrieve Similar Cases (RAG)1\").item.json ?? {}; return Array.isArray(rag.similar_cases) ? rag.similar_cases : []; })() }}",
+              "type": "array"
+            },
+            {
+              "id": "8",
+              "name": "workflow_source",
+              "value": "custom_laravel_ui",
+              "type": "string"
+            },
+            {
+              "id": "9",
+              "name": "knowledge_sources",
+              "value": "={{ { google_sheet_tool: \"Knowledge Base Sheet Tool\", http_rag_fallback: \"Retrieve Similar Cases (RAG)1\", client_lookup: \"Lookup Client Context1\" } }}",
+              "type": "object"
+            },
+            {
+              "id": "10",
+              "name": "validation_errors",
+              "value": "={{ $(\"Normalize Client Input\").item.json.validation_errors ?? [] }}",
               "type": "array"
             }
           ]
         },
         "options": {}
       },
-      "id": "77004425-b155-480e-b494-8458d868f18d",
-      "name": "Prepare AI Context",
+      "id": "ea30e17e-f238-4855-83ae-1b767ddfa465",
+      "name": "Prepare AI Context1",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        912,
-        400
+        1088,
+        288
       ]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "=CURRENT INQUIRY:\nClient: {{ $json.client_name }} ({{ $json.client_email }})\nBuilding: {{ $json.building_name }} ({{ $json.building_size }} units)\nMessage: {{ $json.inquiry_message }}\n\nCLIENT CONTEXT:\n{{ JSON.stringify($json.client_context, null, 2) }}\n\nSIMILAR PAST INQUIRIES (RAG):\n{{ JSON.stringify($json.similar_cases, null, 2) }}\n\nINSTRUCTIONS:\nAnalyze this strata consultancy inquiry and provide a structured response.\n\nClassification Rules:\n- \"New Client\" if client_context.client_exists is false\n- \"Support Request\" if existing client with active projects\n- \"Complaint\" if negative sentiment detected (dissatisfaction, unhappy, issues, problems)\n- \"General Question\" for informational inquiries\n\nUrgency Levels:\n- \"High\" for complaints, urgent issues, or time-sensitive matters\n- \"Medium\" for support requests from existing clients\n- \"Low\" for general questions or new client inquiries\n\nReturn a JSON object with:\n- client_type: \"New Client\" or \"Existing Client\"\n- category: classification from rules above\n- urgency: \"High\", \"Medium\", or \"Low\"\n- confidence: 0-100 (your confidence in the classification)\n- summary: brief 1-sentence summary of the inquiry\n- recommended_actions: array of 2-4 specific action items for staff\n- historical_reference: { similar_case_id, previous_resolution } from RAG data if relevant\n- suggested_response: professional response draft for the client (2-3 paragraphs)\n- requires_human_review: true if confidence < 70 or urgency is High",
+        "text": "=CURRENT CLIENT ENQUIRY\nClient name: {{ $json.client_name || \"Client\" }}\nClient email: {{ $json.client_email || \"not supplied\" }}\nBuilding: {{ $json.building_name || \"not supplied\" }}\nBuilding size: {{ $json.building_size || 0 }} units\nSubmitted message: {{ $json.inquiry_message }}\nValidation errors: {{ JSON.stringify($json.validation_errors || []) }}\n\nCLIENT CONTEXT FROM LOCAL DEMO DATABASE\n{{ JSON.stringify($json.client_context, null, 2) }}\n\nSIMILAR PAST ENQUIRIES FROM HTTP RAG FALLBACK\n{{ JSON.stringify($json.similar_cases, null, 2) }}\n\nGOOGLE SHEETS KNOWLEDGE BASE\nA tool named `Knowledge Base Sheet Tool` is available after Google Sheets credentials/document are configured. Use it to look up relevant rows from the `KnowledgeBase` sheet using the submitted message, category keywords, urgency, and client status. If the tool is unavailable, errors, or returns no useful row, continue with the HTTP RAG fallback above.\n\nTASK\nAnalyse only the client's submitted message and the supplied client/RAG/sheet context. Return a staff-ready triage result for a strata consultancy.\n\nIMPORTANT GUARDRAILS\n- The client's enquiry is the value in \"Submitted message\" only.\n- Do not analyse webhook, Laravel, ngrok, endpoint, HTML, JSON, or integration errors unless those words are explicitly part of the client's submitted message.\n- If validation_errors is not empty, produce a safe staff triage response asking for the missing details and set requires_human_review to true.\n- If client lookup status is `not_found`, continue as a New Client; this is a normal negative lookup, not a workflow failure.\n- If client context, Google Sheets data, or similar cases are unavailable, continue using the submitted message and mark the historical reference as not applicable.\n- Never output null as a client name. Use \"Client\" when the name is missing.\n- Keep recommended actions practical for staff members.\n- Keep the suggested response client-facing, professional, and ready to paste.\n\nCLASSIFICATION\nSet client_type to:\n- \"Existing Client\" when client_context.client_exists is true.\n- \"New Client\" otherwise.\n\nSet category to one of:\n- \"New Client\" for prospective client/service enquiries.\n- \"Support Request\" for existing-client operational help or project follow-up.\n- \"Complaint\" for dissatisfaction, disputes, repeated problems, or negative sentiment.\n- \"Maintenance Request\" for repairs, leaks, safety hazards, access, facilities, or contractors.\n- \"Financial Enquiry\" for levies, invoices, budgets, payments, arrears, or statements.\n- \"General Question\" for broad information requests that do not fit the above.\n\nSet urgency to:\n- \"High\" for safety risks, water/electrical issues, legal/compliance risk, complaints, repeated unresolved issues, or anything requiring same-day attention.\n- \"Medium\" for existing-client support, financial questions, committee/project follow-up, or time-sensitive but non-emergency requests.\n- \"Low\" for general questions or non-urgent new-client enquiries.\n\nOUTPUT JSON FIELDS\n- client_type: \"New Client\" or \"Existing Client\"\n- category: one of the categories listed above\n- urgency: \"High\", \"Medium\", or \"Low\"\n- confidence: integer from 0 to 100\n- summary: one concise sentence about the actual client enquiry\n- recommended_actions: array of 3 to 5 staff actions\n- historical_reference: object with similar_case_id and previous_resolution; use 0 and \"n/a\" if no useful match\n- suggested_response: 2 to 4 short paragraphs addressed to the client by name when available\n- requires_human_review: true when urgency is High, category is Complaint, confidence is below 70, validation_errors is not empty, or the enquiry is ambiguous",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "You are an AI operations assistant for a strata consultancy. Analyze inquiries using client context and historical data to classify, prioritize, and recommend actions. Be professional, empathetic, and leverage past successful resolutions."
+          "systemMessage": "You are a senior strata operations assistant. Your job is to classify client enquiries, recommend the next staff actions, and draft a professional client response. Use the client message as the source of truth. Use Google Sheets knowledge, local demo database context, and HTTP RAG results only as supporting context. Treat missing clients, unavailable knowledge rows, and empty RAG results as normal negative cases. Return only the structured JSON required by the output parser."
         }
       },
-      "id": "ef8b4d2c-000b-4425-852a-1f9f7db884e6",
-      "name": "Classify & Analyze Inquiry",
+      "id": "a2ac13ab-d753-44d3-8faf-2db576d762c5",
+      "name": "Classify & Analyze Inquiry1",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 3.1,
       "position": [
-        1136,
-        400
+        1312,
+        288
       ]
     },
     {
       "parameters": {
         "conditions": {
-          "combinator": "or",
           "options": {
             "caseSensitive": true,
             "leftValue": "",
             "typeValidation": "strict",
-            "version": 1
+            "version": 3
           },
           "conditions": [
             {
@@ -230,17 +302,18 @@
                 "operation": "true"
               }
             }
-          ]
+          ],
+          "combinator": "or"
         },
         "options": {}
       },
-      "id": "e071a318-dfd6-41b7-acc7-0ddca50ee7ea",
-      "name": "Check Urgency",
+      "id": "104b27bb-7d07-4efc-98ae-03a4a514f759",
+      "name": "Check Urgency1",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1488,
-        400
+        1600,
+        288
       ]
     },
     {
@@ -256,13 +329,13 @@
             {
               "id": "2",
               "name": "notification",
-              "value": "={{ \"🚨 HIGH PRIORITY: \" + $json.output.category + \" from \" + $(\"Prepare AI Context\").item.json.client_name }}",
+              "value": "={{ \"HIGH PRIORITY: \" + ($json.output.category || \"Enquiry\") + \" from \" + ($(\"Prepare AI Context1\").item.json.client_name || \"Client\") }}",
               "type": "string"
             },
             {
               "id": "3",
               "name": "assigned_to",
-              "value": "={{ $(\"Prepare AI Context\").item.json.client_context.assigned_consultant ?? \"Unassigned\" }}",
+              "value": "={{ $(\"Prepare AI Context1\").item.json.client_context?.assigned_consultant ?? \"Business Development\" }}",
               "type": "string"
             },
             {
@@ -274,20 +347,20 @@
             {
               "id": "5",
               "name": "client_info",
-              "value": "={{ $(\"Prepare AI Context\").item.json }}",
+              "value": "={{ $(\"Prepare AI Context1\").item.json }}",
               "type": "object"
             }
           ]
         },
         "options": {}
       },
-      "id": "3ce86909-438a-45fa-989e-4143b61aad63",
-      "name": "Escalate to Human Review",
+      "id": "4e933775-634f-44f7-998e-c453cb11838b",
+      "name": "Escalate to Human Review1",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1712,
-        304
+        1856,
+        208
       ]
     },
     {
@@ -303,7 +376,7 @@
             {
               "id": "2",
               "name": "notification",
-              "value": "={{ \"✅ \" + $json.output.category + \" from \" + $(\"Prepare AI Context\").item.json.client_name + \" - Auto-processed\" }}",
+              "value": "={{ \"PROCESSED: \" + ($json.output.category || \"Enquiry\") + \" from \" + ($(\"Prepare AI Context1\").item.json.client_name || \"Client\") }}",
               "type": "string"
             },
             {
@@ -315,20 +388,20 @@
             {
               "id": "4",
               "name": "client_info",
-              "value": "={{ $(\"Prepare AI Context\").item.json }}",
+              "value": "={{ $(\"Prepare AI Context1\").item.json }}",
               "type": "object"
             }
           ]
         },
         "options": {}
       },
-      "id": "db47a74f-2dd2-4fba-99db-3bfab1144ce7",
-      "name": "Standard Response",
+      "id": "d2e32a6f-d25f-4add-b307-62299ef3fc82",
+      "name": "Standard Response1",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1712,
-        496
+        1856,
+        384
       ]
     },
     {
@@ -338,67 +411,99 @@
         "width": 320,
         "color": 4
       },
-      "id": "5825a353-c655-4b31-9eec-d5ccc1b21380",
-      "name": "Workflow Guide",
+      "id": "6a5aa0a6-30d4-4c02-84cc-f394462690b3",
+      "name": "Workflow Guide1",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        160,
+        112,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2064,
+        384
+      ],
+      "id": "cc68cddc-1ea6-4f57-a71a-ad38028cf033",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2064,
         208
-      ]
+      ],
+      "id": "430c748e-9c39-44b8-9f27-ce5d6ff80288",
+      "name": "Respond to Webhook1"
     },
     {
       "parameters": {
-        "content": "## 🔧 Configuration Required\n\n**Backend API Endpoints:**\n1. Client Lookup: `GET /api/client/context?email=...`\n2. RAG Search: `POST /api/rag/search`\n\n**Mock Response Examples:**\n```json\n// Client Context\n{\n  \"client_exists\": true,\n  \"client_id\": 381,\n  \"client_type\": \"Existing\",\n  \"assigned_consultant\": \"Sarah Johnson\",\n  \"past_inquiries_count\": 12,\n  \"active_projects\": [\"Manager Transition\"]\n}\n\n// RAG Similar Cases\n{\n  \"similar_cases\": [\n    {\n      \"inquiry_id\": 1001,\n      \"category\": \"Strata Management Change\",\n      \"actions_taken\": [...],\n      \"resolution\": \"...\"\n    }\n  ]\n}\n```\n\n**For MVP Testing:**\nReplace HTTP Request nodes with mock data using Set nodes.",
-        "height": 612,
-        "width": 540,
-        "color": 5
+        "options": {},
+        "documentId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_WITH_STRATA_KNOWLEDGE_SHEET_ID",
+          "cachedResultName": "Strata Knowledge Base Mock"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "KnowledgeBase",
+          "cachedResultName": "KnowledgeBase"
+        }
       },
-      "id": "5a8cec2c-4cbe-4118-b2de-79546fdd7f1a",
-      "name": "Setup Instructions",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
+      "id": "google-sheet-knowledge-tool",
+      "name": "Knowledge Base Sheet Tool",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
       "position": [
-        160,
-        736
-      ]
+        1440,
+        560
+      ],
+      "notesInFlow": true,
+      "notes": "Upload data/strata_knowledge_base_google_sheet.csv to Google Sheets, name the tab KnowledgeBase, then select the document and sheet here. This is an AI tool; the HTTP RAG node remains the fallback.",
+      "continueOnFail": true
     },
     {
-      "parameters": {
-        "content": "## 🤖 AI Model Settings\n\n**Current Configuration:**\n• Model: gpt-4o-mini\n• Temperature: 0.2 (low for consistent classification)\n• Max Tokens: 1000\n\n**Why Low Temperature?**\nFor triage/classification tasks, we want deterministic, consistent results. Temperature 0.2 ensures the AI follows classification rules strictly.\n\n**Adjust in:** OpenAI Model node → Options → Temperature",
-        "height": 240,
-        "width": 320,
-        "color": 2
-      },
-      "id": "1c87e41f-3c8a-49ac-8347-674451b03c31",
-      "name": "AI Configuration",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
+      "id": "normalize-client-input",
+      "name": "Normalize Client Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        800,
-        896
-      ]
-    },
-    {
+        416,
+        288
+      ],
       "parameters": {
         "assignments": {
           "assignments": [
             {
               "id": "client_email",
               "name": "client_email",
-              "value": "={{ $json.body?.client_email ?? $json.body?.email ?? $json.client_email ?? $json.email }}",
+              "value": "={{ String($json.body?.client_email ?? $json.body?.email ?? $json.client_email ?? $json.email ?? \"\").trim().toLowerCase() }}",
               "type": "string"
             },
             {
               "id": "client_name",
               "name": "client_name",
-              "value": "={{ $json.body?.client_name ?? $json.body?.name ?? $json.client_name ?? $json.name }}",
+              "value": "={{ String($json.body?.client_name ?? $json.body?.name ?? $json.client_name ?? $json.name ?? \"Client\").trim() || \"Client\" }}",
               "type": "string"
             },
             {
               "id": "building_name",
               "name": "building_name",
-              "value": "={{ $json.body?.building_name ?? $json.building_name ?? \"\" }}",
+              "value": "={{ String($json.body?.building_name ?? $json.building_name ?? \"\").trim() }}",
               "type": "string"
             },
             {
@@ -410,141 +515,168 @@
             {
               "id": "message",
               "name": "message",
-              "value": "={{ $json.body?.message ?? $json.body?.inquiry ?? $json.message ?? $json.inquiry }}",
+              "value": "={{ String($json.body?.message ?? $json.body?.inquiry ?? $json.message ?? $json.inquiry ?? \"\").trim() }}",
               "type": "string"
+            },
+            {
+              "id": "source",
+              "name": "source",
+              "value": "custom_laravel_ui",
+              "type": "string"
+            },
+            {
+              "id": "raw_input",
+              "name": "raw_input",
+              "value": "={{ $json.body ?? $json }}",
+              "type": "object"
+            },
+            {
+              "id": "validation_errors",
+              "name": "validation_errors",
+              "value": "={{ [!String($json.body?.message ?? $json.body?.inquiry ?? $json.message ?? $json.inquiry ?? \"\").trim() ? \"missing_message\" : null, !String($json.body?.client_email ?? $json.body?.email ?? $json.client_email ?? $json.email ?? \"\").trim() ? \"missing_client_email\" : null].filter(Boolean) }}",
+              "type": "array"
             }
           ]
         },
         "options": {}
-      },
-      "id": "custom-ui-normalize-input",
-      "name": "Strata Inquiry Form",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        -320,
-        400
-      ]
-    },
-    {
-      "parameters": {
-        "content": "## Custom UI Webhook\n\nUse this workflow when the client form is your own web UI.\n\nProduction webhook URL after activation:\n`https://gabunadame.app.n8n.cloud/webhook/strata-enquiry`\n\nLocal backend/RAG URL configured in HTTP nodes:\n`https://e293-103-43-214-18.ngrok-free.app`",
-        "height": 260,
-        "width": 460,
-        "color": 3
-      },
-      "id": "custom-ui-webhook-note",
-      "name": "Custom UI Webhook Notes",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [
-        -120,
-        96
-      ]
+      }
     }
   ],
   "pinData": {},
   "connections": {
-    "OpenAI Model": {
+    "OpenAI Model1": {
       "ai_languageModel": [
         [
           {
-            "node": "Classify & Analyze Inquiry",
+            "node": "Classify & Analyze Inquiry1",
             "type": "ai_languageModel",
             "index": 0
           }
         ]
       ]
     },
-    "Structured Output Parser": {
+    "Structured Output Parser1": {
       "ai_outputParser": [
         [
           {
-            "node": "Classify & Analyze Inquiry",
+            "node": "Classify & Analyze Inquiry1",
             "type": "ai_outputParser",
             "index": 0
           }
         ]
       ]
     },
-    "Lookup Client Context": {
+    "Knowledge Base Sheet Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Classify & Analyze Inquiry1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Client Context1": {
       "main": [
         [
           {
-            "node": "Retrieve Similar Cases (RAG)",
+            "node": "Retrieve Similar Cases (RAG)1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Retrieve Similar Cases (RAG)": {
+    "Retrieve Similar Cases (RAG)1": {
       "main": [
         [
           {
-            "node": "Prepare AI Context",
+            "node": "Prepare AI Context1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare AI Context": {
+    "Prepare AI Context1": {
       "main": [
         [
           {
-            "node": "Classify & Analyze Inquiry",
+            "node": "Classify & Analyze Inquiry1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Classify & Analyze Inquiry": {
+    "Classify & Analyze Inquiry1": {
       "main": [
         [
           {
-            "node": "Check Urgency",
+            "node": "Check Urgency1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Urgency": {
+    "Check Urgency1": {
       "main": [
         [
           {
-            "node": "Escalate to Human Review",
+            "node": "Escalate to Human Review1",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Standard Response",
+            "node": "Standard Response1",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Custom UI Webhook": {
+    "Standard Response1": {
       "main": [
         [
           {
-            "node": "Strata Inquiry Form",
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Strata Inquiry Form": {
+    "Escalate to Human Review1": {
       "main": [
         [
           {
-            "node": "Lookup Client Context",
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strata Inquiry Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Client Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Client Input": {
+      "main": [
+        [
+          {
+            "node": "Lookup Client Context1",
             "type": "main",
             "index": 0
           }
@@ -552,13 +684,15 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
+  "versionId": "dab216b5-ee14-46a6-b599-38b830b57f97",
   "meta": {
     "instanceId": "ec3b3be42921bc408f65d871f0fb08b65e699857bb1bef89d686a642b4c56ef9"
   },
+  "id": "aw10EJHYqCenIw6T",
   "tags": []
 }

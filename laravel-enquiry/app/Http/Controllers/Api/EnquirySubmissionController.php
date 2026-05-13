@@ -82,10 +82,14 @@ class EnquirySubmissionController extends Controller
             ? $response->json()
             : ['message' => $response->body()];
 
+        $errorMessage = $response->successful()
+            ? null
+            : data_get($body, 'message', 'n8n webhook returned an unsuccessful response.');
+
         $enquiry->update([
             'status' => $response->successful() ? 'submitted_to_n8n' : 'failed',
             'n8n_response' => $body,
-            'error_message' => $response->successful() ? null : $response->body(),
+            'error_message' => $errorMessage,
         ]);
 
         return response()->json([
@@ -93,6 +97,7 @@ class EnquirySubmissionController extends Controller
             'enquiry_id' => $enquiry->public_id,
             'n8n_status' => $response->status(),
             'n8n_response' => $body,
+            'error' => $errorMessage,
         ], $response->successful() ? 200 : 502);
     }
 }
