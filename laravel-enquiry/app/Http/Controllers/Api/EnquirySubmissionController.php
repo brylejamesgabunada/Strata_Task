@@ -15,6 +15,7 @@ class EnquirySubmissionController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
+        // The browser client form posts these fields as JSON. Validation happens before any DB write.
         $payload = $request->validate([
             'client_email' => ['required', 'email'],
             'client_name' => ['required', 'string', 'max:255'],
@@ -23,12 +24,14 @@ class EnquirySubmissionController extends Controller
             'message' => ['required', 'string'],
         ]);
 
+        // Save first so the staff dashboard can show a local record even if n8n is slow or unavailable.
         $enquiry = Enquiry::query()->create([
             ...$payload,
             'public_id' => (string) Str::uuid(),
             'status' => 'pending',
         ]);
 
+        // N8N_WEBHOOK_URL points to either the active production webhook or a one-shot test webhook.
         $webhookUrl = config('services.n8n.webhook_url');
         if (! $webhookUrl) {
             $enquiry->update([
@@ -43,6 +46,7 @@ class EnquirySubmissionController extends Controller
         }
 
         try {
+            // This is the handoff from Laravel to n8n. n8n will call Laravel back for client context.
             $response = Http::acceptJson()
                 ->timeout(300)
                 ->post($webhookUrl, $payload);
@@ -50,6 +54,7 @@ class EnquirySubmissionController extends Controller
             Log::error('print payload', ['payload' => $payload]);
             Log::error('Error connecting to n8n webhook', ['error' => $exception->getMessage()]);
             if (str_contains($exception->getMessage(), 'cURL error 28')) {
+                // Treat webhook timeouts as "submitted" because n8n may still finish asynchronously.
                 $enquiry->update([
                     'status' => 'submitted_to_n8n_timeout',
                     'n8n_response' => [
@@ -78,10 +83,12 @@ class EnquirySubmissionController extends Controller
             ], 502);
         }
 
+        // n8n should respond with JSON, but this fallback keeps ngrok/html errors readable in the UI.
         $body = str_contains($response->header('content-type', ''), 'application/json')
             ? $response->json()
             : ['message' => $response->body()];
 
+        // Store the exact n8n response. DashboardController formats this raw payload for staff display.
         $errorMessage = $response->successful()
             ? null
             : data_get($body, 'message', 'n8n webhook returned an unsuccessful response.');

@@ -10,11 +10,13 @@ class DashboardController extends Controller
 {
     public function client(): View
     {
+        // Render the public intake form. Its JavaScript posts to /api/enquiries/submit.
         return view('client-form');
     }
 
     public function staff(): View
     {
+        // Initial page load includes current dashboard data so staff see content before polling starts.
         return view('staff-dashboard', [
             'dashboard' => $this->staffPayload(),
         ]);
@@ -22,6 +24,7 @@ class DashboardController extends Controller
 
     public function staffData(): JsonResponse
     {
+        // AJAX polling endpoint used by staff-dashboard.blade.php every 5 seconds.
         return response()->json($this->staffPayload());
     }
 
@@ -30,15 +33,22 @@ class DashboardController extends Controller
      */
     private function staffPayload(): array
     {
+        // Fetch only inquiries that reached n8n and received a JSON response.
+        // Local failed/pending transport records are useful for debugging, but they are not staff work.
         $enquiries = Enquiry::query()
+            ->where('status', 'submitted_to_n8n')
+            ->whereNotNull('n8n_response')
             ->latest()
             ->limit(40)
             ->get()
-            ->map(fn (Enquiry $enquiry) => $this->formatForStaff($enquiry));
+            ->map(fn (Enquiry $enquiry) => $this->formatForStaff($enquiry))
+            ->filter(fn (array $enquiry) => in_array($enquiry['workflow_status'], ['PROCESSED', 'ESCALATED'], true))
+            ->reject(fn (array $enquiry) => $enquiry['integration_problem'])
+            ->values();
 
         return [
             'enquiries' => $enquiries,
-            'totalCount' => Enquiry::query()->count(),
+            'totalCount' => $enquiries->count(),
             'processedCount' => $enquiries->where('workflow_status', 'PROCESSED')->count(),
             'escalatedCount' => $enquiries->where('workflow_status', 'ESCALATED')->count(),
             'reviewCount' => $enquiries->where('requires_human_review', true)->count(),
@@ -52,8 +62,11 @@ class DashboardController extends Controller
      */
     private function formatForStaff(Enquiry $enquiry): array
     {
+        // n8n returns either an array with one item or a single object depending on the response node.
         $response = $enquiry->n8n_response ?? [];
         $workflowResult = array_is_list($response) ? ($response[0] ?? []) : $response;
+
+        // analysis contains AI classification; client_info contains the normalized input/context from n8n.
         $analysis = data_get($workflowResult, 'analysis', []);
         $clientInfo = data_get($workflowResult, 'client_info', []);
         $recommendedActions = data_get($analysis, 'recommended_actions', []);
@@ -62,6 +75,7 @@ class DashboardController extends Controller
         $urgency = data_get($analysis, 'urgency', 'Pending');
         $integrationProblem = $this->hasIntegrationProblem($workflowResult, $clientInfo);
 
+        // Prefer n8n-normalized values, but fall back to the original Laravel submission if n8n failed.
         return [
             'id' => $enquiry->public_id,
             'created_at' => $enquiry->created_at?->toIso8601String(),
@@ -98,6 +112,7 @@ class DashboardController extends Controller
      */
     private function hasIntegrationProblem(array $workflowResult, array $clientInfo): bool
     {
+        // Prevent old ngrok/html error content from being displayed as real AI staff recommendations.
         $clientContextData = data_get($clientInfo, 'client_context.data');
         $summary = (string) data_get($workflowResult, 'analysis.summary', '');
 

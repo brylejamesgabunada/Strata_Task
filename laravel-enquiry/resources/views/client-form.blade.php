@@ -203,6 +203,7 @@
                 <h2>Submit an enquiry</h2>
             </div>
 
+            {{-- This form is the public client entry point. JavaScript below sends it to /api/enquiries/submit. --}}
             <form id="enquiryForm">
                 <label>
                     <span>Email Address</span>
@@ -233,16 +234,19 @@
                     <button type="submit" id="submitButton">Submit enquiry</button>
                 </div>
 
+                {{-- The browser writes success, timeout, and validation messages here after submission. --}}
                 <div id="formStatus" role="status" aria-live="polite"></div>
             </form>
         </section>
     </main>
 
     <script>
+        // These elements control the full client-side submission lifecycle for the intake form.
         const form = document.querySelector('#enquiryForm');
         const button = document.querySelector('#submitButton');
         const status = document.querySelector('#formStatus');
 
+        // Server and workflow messages can include user-provided text, so render them as escaped HTML.
         function escapeHtml(value) {
             return String(value)
                 .replaceAll('&', '&amp;')
@@ -258,12 +262,14 @@
             status.className = 'visible';
             status.innerHTML = '<span class="status-icon">...</span><span class="status-copy"><strong>Submitting enquiry</strong><span>Sending your enquiry to the review workflow.</span></span>';
 
+            // Convert the form into the JSON shape expected by EnquirySubmissionController.
             const payload = Object.fromEntries(new FormData(form).entries());
             if (payload.building_size === '') {
                 delete payload.building_size;
             }
 
             try {
+                // Laravel saves the enquiry, forwards it to n8n, then returns the local enquiry ID.
                 const response = await fetch('/api/enquiries/submit', {
                     method: 'POST',
                     headers: {
@@ -273,6 +279,7 @@
                     body: JSON.stringify(payload),
                 });
 
+                // n8n or ngrok failures may return HTML/text; handle both JSON and non-JSON safely.
                 const contentType = response.headers.get('content-type') || '';
                 const data = contentType.includes('application/json')
                     ? await response.json()
@@ -287,6 +294,7 @@
                     throw new Error(workflowError);
                 }
 
+                // A successful local save is enough for the demo: staff will see it through polling.
                 form.reset();
                 const message = data.pending_n8n_response
                     ? `Your enquiry was saved. Staff can review it once the workflow response is available. Reference: ${data.enquiry_id}`

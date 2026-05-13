@@ -196,6 +196,7 @@
     </header>
 
     <main>
+        {{-- Dashboard totals are rendered from the same payload used by the enquiry queue below. --}}
         <div class="stats">
             <div class="stat"><span>Total</span><strong id="totalCount">0</strong></div>
             <div class="stat"><span>Processed</span><strong id="processedCount">0</strong></div>
@@ -203,8 +204,9 @@
             <div class="stat"><span>Human review</span><strong id="reviewCount">0</strong></div>
         </div>
 
-        <div class="empty" id="emptyState" hidden>No enquiries have been submitted yet.</div>
+        <div class="empty" id="emptyState" hidden>No processed enquiries are ready for staff review yet.</div>
 
+        {{-- The left queue lists submissions; the right detail pane shows the selected AI recommendation. --}}
         <div class="workspace" id="workspace">
             <aside class="queue" id="queue" aria-label="Enquiry queue"></aside>
             <section class="detail" id="detail"></section>
@@ -212,6 +214,7 @@
     </main>
 
     <script>
+        // DashboardController injects the first payload during page render so staff see data immediately.
         const initialDashboard = @json($dashboard);
         const queue = document.querySelector('#queue');
         const detail = document.querySelector('#detail');
@@ -228,6 +231,7 @@
         let selectedId = null;
         let latestId = initialDashboard.latestId || null;
 
+        // All rendered fields are escaped because they can contain client input or AI-generated text.
         function escapeHtml(value) {
             return String(value ?? '')
                 .replaceAll('&', '&amp;')
@@ -241,6 +245,7 @@
             return `<span class="chip ${escapeHtml(className)}">${escapeHtml(label)}</span>`;
         }
 
+        // Render the clickable enquiry queue. Selecting an item redraws the detail pane below.
         function renderQueue(items, highlightId = null) {
             queue.innerHTML = items.map((item, index) => {
                 const active = item.id === selectedId || (!selectedId && index === 0);
@@ -270,6 +275,7 @@
             });
         }
 
+        // Render the staff review view: classification, context, recommended actions, and response draft.
         function renderDetail(item) {
             if (!item) {
                 detail.innerHTML = '<div class="empty">Select an enquiry to review details.</div>';
@@ -319,6 +325,7 @@
             `;
         }
 
+        // Apply a fresh staff payload to the whole dashboard while keeping the selected enquiry stable.
         function renderDashboard(data, highlightId = null) {
             window.currentDashboard = data;
             const items = data.enquiries || [];
@@ -346,6 +353,7 @@
             renderDetail(items.find((item) => item.id === selectedId));
         }
 
+        // Poll Laravel for near-realtime updates. This avoids a full WebSocket setup for the demo.
         async function refreshDashboard() {
             try {
                 const response = await fetch('/api/enquiries/staff', {
@@ -371,6 +379,7 @@
             }
         }
 
+        // Initial render uses the server-provided data; later renders come from AJAX polling.
         renderDashboard(initialDashboard);
         setInterval(refreshDashboard, 5000);
     </script>

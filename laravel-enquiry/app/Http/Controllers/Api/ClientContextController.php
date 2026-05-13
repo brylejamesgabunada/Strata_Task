@@ -11,6 +11,8 @@ class ClientContextController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
+        // n8n calls this endpoint with ?email=... while processing a submitted enquiry.
+        // The response gives the workflow enough client context to classify "new" vs "existing".
         $email = strtolower(trim((string) $request->query('email')));
         $client = StrataClient::query()
             ->with('lots')
@@ -18,6 +20,8 @@ class ClientContextController extends Controller
             ->first();
 
         if (! $client || $client->status !== 'active') {
+            // Missing and inactive clients are treated as new enquiries so the workflow can continue.
+            // This prevents a failed lookup from blocking AI classification and staff review.
             return response()->json([
                 'client_exists' => false,
                 'client_id' => $client?->client_id,
@@ -33,6 +37,8 @@ class ClientContextController extends Controller
             ]);
         }
 
+        // Existing active clients include account, lot, levy, and portal context for the n8n prompt.
+        // The AI node uses this to recommend staff actions that fit the client's current situation.
         return response()->json([
             'client_exists' => true,
             'client_id' => $client->client_id,

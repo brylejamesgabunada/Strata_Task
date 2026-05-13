@@ -7,12 +7,12 @@ Strata Enquiry Desk is a Laravel demo application that connects a custom client 
 1. A client submits an enquiry from a web form.
 2. Laravel stores the enquiry in SQLite.
 3. Laravel forwards the enquiry to n8n.
-4. n8n enriches the enquiry with client context and similar past cases.
+4. n8n enriches the enquiry with client context and Google Sheets past inquiry knowledge.
 5. n8n uses an AI model to classify the enquiry and generate staff recommendations.
 6. Laravel stores the n8n response and displays it in a staff dashboard.
 7. The staff dashboard polls for new enquiries every 5 seconds.
 
-The AI analysis happens in n8n. Laravel handles the web UI, local database, mock client data, RAG-style lookup endpoints, submission storage, and dashboard display.
+The AI analysis and RAG-style knowledge retrieval happen in n8n. Laravel handles the web UI, local database, mock client data, submission storage, and dashboard display.
 
 ## Purpose
 
@@ -113,10 +113,9 @@ Required n8n callback endpoints:
 
 ```text
 GET https://8137-103-43-214-18.ngrok-free.app/api/client/context?email={{ $json.client_email }}
-POST https://8137-103-43-214-18.ngrok-free.app/api/rag/search
 ```
 
-Add this header to both n8n HTTP Request nodes:
+Add this header to the n8n HTTP Request node:
 
 ```text
 ngrok-skip-browser-warning: true
@@ -132,18 +131,12 @@ Laravel uses SQLite at:
 database/database.sqlite
 ```
 
-Mock data is loaded by `Database\Seeders\MockWorkflowDataSeeder` from:
-
-```text
-../mock_client_database.json
-../rag_seed_data.json
-```
+Mock client data is defined directly in `Database\Seeders\MockWorkflowDataSeeder` and inserted into the SQLite database.
 
 Tables used in the demo:
 
 - `strata_clients`: mock existing clients.
 - `client_lots`: lot/building records linked to clients.
-- `past_enquiries`: historical cases for RAG-style lookup.
 - `enquiries`: client submissions and stored n8n responses.
 
 Reset and seed:
@@ -194,20 +187,6 @@ GET /api/client/context?email=maria.santos@email.com
 
 Returns existing client context when the email matches the mock database. If no client is found, Laravel returns a valid JSON "New Client" context. This is intentional and prevents "not found" cases from becoming workflow failures.
 
-### Similar case lookup
-
-```http
-POST /api/rag/search
-Content-Type: application/json
-
-{
-  "query": "water leaking near lift",
-  "limit": 3
-}
-```
-
-Returns similar past enquiries from the seeded `past_enquiries` records.
-
 ### Submit enquiry
 
 ```http
@@ -254,22 +233,17 @@ Recommended flow:
    - Existing clients return account/project context.
    - Missing clients return a safe `New Client` context.
 
-4. **Retrieve Similar Cases (RAG)**
-   - Calls Laravel `/api/rag/search`.
-   - Retrieves similar historical enquiries.
+4. **Knowledge Base Sheet Tool**
+   - The AI agent queries Google Sheets for past inquiry knowledge.
+   - This is the RAG-style retrieval path for the demo.
 
 5. **Prepare AI Context**
-   - Combines normalized input, client context, validation state, and similar cases.
-   - Handles negative cases like empty RAG results or unavailable lookup responses.
-
-6. **Knowledge Base Sheet Tool**
-   - Optional Google Sheets AI tool.
-   - Upload `../data/strata_knowledge_base_google_sheet.csv` to Google Sheets and configure this node if you want sheet-backed knowledge.
-   - HTTP RAG remains as fallback.
+   - Combines normalized input, client context, validation state, and sheet knowledge.
+   - Handles negative cases like unavailable sheet data, empty fallback results, or unavailable lookup responses.
 
 7. **Classify & Analyze Inquiry**
    - Uses the AI model and structured output parser.
-   - The prompt instructs the AI to analyze only the submitted client message and use lookup/RAG/sheet data only as supporting context.
+   - The prompt instructs the AI to analyze only the submitted client message and use lookup/sheet/fallback data only as supporting context.
 
 8. **Check Urgency**
    - Routes High urgency or human-review cases to escalation.
@@ -297,7 +271,7 @@ The AI returns:
 ## Demo Script
 
 1. **Open n8n workflow**
-   - Show the webhook trigger, client lookup, RAG lookup, AI analysis, urgency check, and response nodes.
+   - Show the webhook trigger, client lookup, Google Sheets knowledge tool, optional fallback lookup, AI analysis, urgency check, and response nodes.
 
 2. **Explain Laravel role**
    - Laravel is the UI and database layer.
@@ -316,7 +290,7 @@ The AI returns:
 
 6. **Show n8n execution**
    - Show the workflow receiving the payload.
-   - Show the client context and similar case retrieval.
+   - Show the client context and Google Sheets knowledge retrieval.
    - Show the AI result.
 
 7. **Show staff dashboard**
@@ -326,7 +300,7 @@ The AI returns:
 
 8. **Discuss negative cases**
    - Unknown email becomes New Client.
-   - Empty RAG results are allowed.
+   - Empty Google Sheet/fallback results are allowed.
    - n8n test webhook requires "Listen for test event".
    - ngrok restart requires updating callback URLs.
 
@@ -369,14 +343,13 @@ The dashboard polls this endpoint every 5 seconds.
 
 ### ngrok URL changed
 
-Update both n8n HTTP Request nodes:
+Update the n8n HTTP Request node:
 
 - Client context node
-- RAG search node
 
 ### Google Sheets tool is not configured
 
-The workflow still works through HTTP RAG fallback. To enable sheet knowledge, upload:
+The RAG-style path is the Google Sheets AI tool. To enable sheet knowledge, upload:
 
 ```text
 ../data/strata_knowledge_base_google_sheet.csv
