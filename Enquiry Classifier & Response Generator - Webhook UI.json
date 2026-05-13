@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Configuration Required\n\n**Backend API Endpoints:**\n1. Client Lookup: `GET /api/client/context?email=...`\n2. RAG Search fallback: `POST /api/rag/search`\n\n**Google Sheets Knowledge Base:**\nUpload `data/strata_knowledge_base_google_sheet.csv` to Google Sheets, name the tab `KnowledgeBase`, then configure the `Knowledge Base Sheet Tool` node with your Google OAuth credential, document, and sheet.\n\n**Negative-case handling:**\n- Client not found continues as `New Client`.\n- Client lookup HTML/error responses are treated as unavailable context, not as the enquiry.\n- Empty RAG results become an empty array.\n- The AI prompt must analyze only the submitted client message.",
+        "content": "## Configuration Required\n\n**Backend API Endpoints:**\n1. Client Lookup: `GET /api/client/context?email=...`\n\n**Google Sheets Knowledge Base:**\nUpload `data/strata_knowledge_base_google_sheet.csv` to Google Sheets, name the tab `KnowledgeBase`, then configure the `Knowledge Base Sheet Tool` node with your Google OAuth credential, document, and sheet.\n\n**Negative-case handling:**\n- Client not found continues as `New Client`.\n- Client lookup HTML/error responses are treated as unavailable context, not as the enquiry.\n- The AI prompt must analyze only the submitted client message.",
         "height": 420,
         "width": 560,
         "color": 5
@@ -143,44 +143,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://8137-103-43-214-18.ngrok-free.app/api/rag/search",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "ngrok-skip-browser-warning",
-              "value": "true"
-            },
-            {
-              "name": "accept",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { \"query\": $(\"Normalize Client Input\").item.json.message, \"limit\": 3 } }}",
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
-        }
-      },
-      "id": "c7b9d13b-4220-4ffb-be5c-4a99114d5d03",
-      "name": "Retrieve Similar Cases (RAG)1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        864,
-        288
-      ],
-      "alwaysOutputData": true
-    },
-    {
-      "parameters": {
         "assignments": {
           "assignments": [
             {
@@ -222,7 +184,7 @@
             {
               "id": "7",
               "name": "similar_cases",
-              "value": "={{ (() => { const rag = $(\"Retrieve Similar Cases (RAG)1\").item.json ?? {}; return Array.isArray(rag.similar_cases) ? rag.similar_cases : []; })() }}",
+              "value": "={{ [] }}",
               "type": "array"
             },
             {
@@ -234,7 +196,7 @@
             {
               "id": "9",
               "name": "knowledge_sources",
-              "value": "={{ { google_sheet_tool: \"Knowledge Base Sheet Tool\", http_rag_fallback: \"Retrieve Similar Cases (RAG)1\", client_lookup: \"Lookup Client Context1\" } }}",
+              "value": "={{ { client_lookup: \"Laravel /api/client/context\", google_sheet_tool: \"Knowledge Base Sheet Tool\" } }}",
               "type": "object"
             },
             {
@@ -259,10 +221,10 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "=CURRENT CLIENT ENQUIRY\nClient name: {{ $json.client_name || \"Client\" }}\nClient email: {{ $json.client_email || \"not supplied\" }}\nBuilding: {{ $json.building_name || \"not supplied\" }}\nBuilding size: {{ $json.building_size || 0 }} units\nSubmitted message: {{ $json.inquiry_message }}\nValidation errors: {{ JSON.stringify($json.validation_errors || []) }}\n\nCLIENT CONTEXT FROM LOCAL DEMO DATABASE\n{{ JSON.stringify($json.client_context, null, 2) }}\n\nSIMILAR PAST ENQUIRIES FROM HTTP RAG FALLBACK\n{{ JSON.stringify($json.similar_cases, null, 2) }}\n\nGOOGLE SHEETS KNOWLEDGE BASE\nA tool named `Knowledge Base Sheet Tool` is available after Google Sheets credentials/document are configured. Use it to look up relevant rows from the `KnowledgeBase` sheet using the submitted message, category keywords, urgency, and client status. If the tool is unavailable, errors, or returns no useful row, continue with the HTTP RAG fallback above.\n\nTASK\nAnalyse only the client's submitted message and the supplied client/RAG/sheet context. Return a staff-ready triage result for a strata consultancy.\n\nIMPORTANT GUARDRAILS\n- The client's enquiry is the value in \"Submitted message\" only.\n- Do not analyse webhook, Laravel, ngrok, endpoint, HTML, JSON, or integration errors unless those words are explicitly part of the client's submitted message.\n- If validation_errors is not empty, produce a safe staff triage response asking for the missing details and set requires_human_review to true.\n- If client lookup status is `not_found`, continue as a New Client; this is a normal negative lookup, not a workflow failure.\n- If client context, Google Sheets data, or similar cases are unavailable, continue using the submitted message and mark the historical reference as not applicable.\n- Never output null as a client name. Use \"Client\" when the name is missing.\n- Keep recommended actions practical for staff members.\n- Keep the suggested response client-facing, professional, and ready to paste.\n\nCLASSIFICATION\nSet client_type to:\n- \"Existing Client\" when client_context.client_exists is true.\n- \"New Client\" otherwise.\n\nSet category to one of:\n- \"New Client\" for prospective client/service enquiries.\n- \"Support Request\" for existing-client operational help or project follow-up.\n- \"Complaint\" for dissatisfaction, disputes, repeated problems, or negative sentiment.\n- \"Maintenance Request\" for repairs, leaks, safety hazards, access, facilities, or contractors.\n- \"Financial Enquiry\" for levies, invoices, budgets, payments, arrears, or statements.\n- \"General Question\" for broad information requests that do not fit the above.\n\nSet urgency to:\n- \"High\" for safety risks, water/electrical issues, legal/compliance risk, complaints, repeated unresolved issues, or anything requiring same-day attention.\n- \"Medium\" for existing-client support, financial questions, committee/project follow-up, or time-sensitive but non-emergency requests.\n- \"Low\" for general questions or non-urgent new-client enquiries.\n\nOUTPUT JSON FIELDS\n- client_type: \"New Client\" or \"Existing Client\"\n- category: one of the categories listed above\n- urgency: \"High\", \"Medium\", or \"Low\"\n- confidence: integer from 0 to 100\n- summary: one concise sentence about the actual client enquiry\n- recommended_actions: array of 3 to 5 staff actions\n- historical_reference: object with similar_case_id and previous_resolution; use 0 and \"n/a\" if no useful match\n- suggested_response: 2 to 4 short paragraphs addressed to the client by name when available\n- requires_human_review: true when urgency is High, category is Complaint, confidence is below 70, validation_errors is not empty, or the enquiry is ambiguous",
+        "text": "=CURRENT CLIENT ENQUIRY\nClient name: {{ $json.client_name || \"Client\" }}\nClient email: {{ $json.client_email || \"not supplied\" }}\nBuilding: {{ $json.building_name || \"not supplied\" }}\nBuilding size: {{ $json.building_size || 0 }} units\nSubmitted message: {{ $json.inquiry_message }}\nValidation errors: {{ JSON.stringify($json.validation_errors || []) }}\n\nCLIENT CONTEXT FROM LOCAL DEMO DATABASE\n{{ JSON.stringify($json.client_context, null, 2) }}\n\nGOOGLE SHEETS KNOWLEDGE BASE\nA tool named `Knowledge Base Sheet Tool` is available after Google Sheets credentials/document are configured. Use it to look up relevant rows from the `KnowledgeBase` sheet using the submitted message, category keywords, urgency, and client status. If the tool is unavailable, errors, or returns no useful row, continue using the submitted message and Laravel client context.\n\nTASK\nAnalyse only the client's submitted message and the supplied client and Google Sheets context. Return a staff-ready triage result for a strata consultancy.\n\nIMPORTANT GUARDRAILS\n- The client's enquiry is the value in \"Submitted message\" only.\n- Do not analyse webhook, Laravel, ngrok, endpoint, HTML, JSON, or integration errors unless those words are explicitly part of the client's submitted message.\n- If validation_errors is not empty, produce a safe staff triage response asking for the missing details and set requires_human_review to true.\n- If client lookup status is `not_found`, continue as a New Client; this is a normal negative lookup, not a workflow failure.\n- If client context or Google Sheets data is unavailable, continue using the submitted message and mark the historical reference as not applicable.\n- Never output null as a client name. Use \"Client\" when the name is missing.\n- Keep recommended actions practical for staff members.\n- Keep the suggested response client-facing, professional, and ready to paste.\n\nCLASSIFICATION\nSet client_type to:\n- \"Existing Client\" when client_context.client_exists is true.\n- \"New Client\" otherwise.\n\nSet category to one of:\n- \"New Client\" for prospective client/service enquiries.\n- \"Support Request\" for existing-client operational help or project follow-up.\n- \"Complaint\" for dissatisfaction, disputes, repeated problems, or negative sentiment.\n- \"Maintenance Request\" for repairs, leaks, safety hazards, access, facilities, or contractors.\n- \"Financial Enquiry\" for levies, invoices, budgets, payments, arrears, or statements.\n- \"General Question\" for broad information requests that do not fit the above.\n\nSet urgency to:\n- \"High\" for safety risks, water/electrical issues, legal/compliance risk, complaints, repeated unresolved issues, or anything requiring same-day attention.\n- \"Medium\" for existing-client support, financial questions, committee/project follow-up, or time-sensitive but non-emergency requests.\n- \"Low\" for general questions or non-urgent new-client enquiries.\n\nOUTPUT JSON FIELDS\n- client_type: \"New Client\" or \"Existing Client\"\n- category: one of the categories listed above\n- urgency: \"High\", \"Medium\", or \"Low\"\n- confidence: integer from 0 to 100\n- summary: one concise sentence about the actual client enquiry\n- recommended_actions: array of 3 to 5 staff actions\n- historical_reference: object with similar_case_id and previous_resolution; use 0 and \"n/a\" if no useful match\n- suggested_response: 2 to 4 short paragraphs addressed to the client by name when available\n- requires_human_review: true when urgency is High, category is Complaint, confidence is below 70, validation_errors is not empty, or the enquiry is ambiguous",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "You are a senior strata operations assistant. Your job is to classify client enquiries, recommend the next staff actions, and draft a professional client response. Use the client message as the source of truth. Use Google Sheets knowledge, local demo database context, and HTTP RAG results only as supporting context. Treat missing clients, unavailable knowledge rows, and empty RAG results as normal negative cases. Return only the structured JSON required by the output parser."
+          "systemMessage": "You are a senior strata operations assistant. Your job is to classify client enquiries, recommend the next staff actions, and draft a professional client response. Use the client message as the source of truth. Use Google Sheets knowledge, local demo database context only as supporting context. Treat missing clients and unavailable knowledge rows as normal negative cases. Return only the structured JSON required by the output parser."
         }
       },
       "id": "a2ac13ab-d753-44d3-8faf-2db576d762c5",
@@ -406,7 +368,7 @@
     },
     {
       "parameters": {
-        "content": "## 🎯 Workflow Overview\n\nThis workflow demonstrates enterprise-grade inquiry triage with:\n\n**1. Form Capture** - Collect client details\n**2. Client Lookup** - Retrieve ownership & history\n**3. RAG Retrieval** - Find similar past cases\n**4. AI Analysis** - Context-aware classification\n**5. Smart Routing** - Escalate or auto-process\n\n**Key Features:**\n• Email-based client identification\n• Historical case similarity matching\n• Sentiment-based urgency detection\n• Automated response generation\n• Human review for high-priority cases",
+        "content": "## 🎯 Workflow Overview\n\nThis workflow demonstrates enterprise-grade inquiry triage with:\n\n**1. Form Capture** - Collect client details\n**2. Client Lookup** - Retrieve ownership & history\n**3. Knowledge Retrieval** - Query Google Sheets through the AI Agent\n**4. AI Analysis** - Context-aware classification\n**5. Smart Routing** - Escalate or auto-process\n\n**Key Features:**\n• Email-based client identification\n• Google Sheets knowledge retrieval\n• Sentiment-based urgency detection\n• Automated response generation\n• Human review for high-priority cases",
         "height": 280,
         "width": 320,
         "color": 4
@@ -473,7 +435,7 @@
         560
       ],
       "notesInFlow": true,
-      "notes": "Upload data/strata_knowledge_base_google_sheet.csv to Google Sheets, name the tab KnowledgeBase, then select the document and sheet here. This is an AI tool; the HTTP RAG node remains the fallback.",
+      "notes": "Upload data/strata_knowledge_base_google_sheet.csv to Google Sheets, name the tab KnowledgeBase, then select the document and sheet here. This AI tool is the RAG/knowledge source.",
       "continueOnFail": true
     },
     {
@@ -578,17 +540,6 @@
       ]
     },
     "Lookup Client Context1": {
-      "main": [
-        [
-          {
-            "node": "Retrieve Similar Cases (RAG)1",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Retrieve Similar Cases (RAG)1": {
       "main": [
         [
           {

@@ -1,0 +1,33 @@
+.DS_Store
+Thumbs.db
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+auth.json
+
+# Dependencies
+vendor/
+node_modules/
+
+# Laravel generated files
+bootstrap/cache/*.php
+!bootstrap/cache/.gitignore
+storage/logs/*.log
+storage/framework/views/*.php
+database/*.sqlite*
+.phpunit.result.cache
+.phpunit.cache/
+
+# Frontend build output
+public/build/
+public/hot
+
+# Editor and OS files
+.idea/
+.vscode/
+.zed/
+*.swp
+*.bak
+*.tmp
