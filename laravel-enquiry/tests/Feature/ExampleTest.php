@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Enquiry;
 use App\Models\StrataClient;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -114,6 +116,35 @@ class ExampleTest extends TestCase
             ->assertJsonPath('totalCount', 1)
             ->assertJsonPath('enquiries.0.workflow_status', 'PROCESSED')
             ->assertJsonPath('enquiries.0.client_name', 'Processed Client');
+    }
+
+    public function test_the_enquiry_submit_api_returns_pending_when_n8n_times_out(): void
+    {
+        config([
+            'services.n8n.webhook_url' => 'https://n8n.example.test/webhook/strata-enquiry',
+            'services.n8n.timeout' => 10,
+            'services.n8n.connect_timeout' => 5,
+        ]);
+
+        Http::fake(function () {
+            throw new ConnectionException('cURL error 28: Operation timed out after 10000 milliseconds');
+        });
+
+        $this->postJson('/api/enquiries/submit', [
+            'client_email' => 'timeout@example.com',
+            'client_name' => 'Timeout Client',
+            'building_name' => 'Slow Workflow Building',
+            'building_size' => 10,
+            'message' => 'Please classify this enquiry.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('submitted', true)
+            ->assertJsonPath('pending_n8n_response', true);
+
+        $this->assertDatabaseHas('enquiries', [
+            'client_email' => 'timeout@example.com',
+            'status' => 'submitted_to_n8n_timeout',
+        ]);
     }
 
     public function test_the_client_context_api_returns_database_client_context(): void

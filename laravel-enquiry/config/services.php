@@ -37,6 +37,8 @@ return [
 
     'n8n' => [
         'webhook_url' => env('N8N_WEBHOOK_URL'),
+        'timeout' => env('N8N_WEBHOOK_TIMEOUT', 10),
+        'connect_timeout' => env('N8N_WEBHOOK_CONNECT_TIMEOUT', 5),
     ],
 
 ];

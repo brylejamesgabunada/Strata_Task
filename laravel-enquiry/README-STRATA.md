@@ -37,7 +37,7 @@ Minimum task coverage:
 Install PHP dependencies:
 
 ```bash
-cd "/Users/fdc.brylejames-nc-web/Documents/Personal Task/laravel-enquiry"
+cd "/Users/fdc.brylejames-nc-web/Documents/Personal_Task/laravel-enquiry"
 composer install
 ```
 

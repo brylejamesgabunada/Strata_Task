@@ -47,8 +47,12 @@ class EnquirySubmissionController extends Controller
 
         try {
             // This is the handoff from Laravel to n8n. n8n will call Laravel back for client context.
+            $webhookTimeout = $this->webhookTimeout();
+            $webhookConnectTimeout = min($webhookTimeout, max(1, (int) config('services.n8n.connect_timeout', 5)));
+
             $response = Http::acceptJson()
-                ->timeout(300)
+                ->connectTimeout($webhookConnectTimeout)
+                ->timeout($webhookTimeout)
                 ->post($webhookUrl, $payload);
         } catch (ConnectionException $exception) {
             Log::error('print payload', ['payload' => $payload]);
@@ -67,7 +71,7 @@ class EnquirySubmissionController extends Controller
                     'submitted' => true,
                     'pending_n8n_response' => true,
                     'enquiry_id' => $enquiry->public_id,
-                    'message' => 'Submitted to n8n, but n8n did not return a webhook response. Set the n8n Webhook node to respond immediately to remove this warning.',
+                    'message' => 'Submitted to n8n, but n8n did not return a webhook response before Laravel timed out. Set the n8n Webhook node to respond immediately to remove this warning.',
                 ]);
             }
 
@@ -106,5 +110,17 @@ class EnquirySubmissionController extends Controller
             'n8n_response' => $body,
             'error' => $errorMessage,
         ], $response->successful() ? 200 : 502);
+    }
+
+    private function webhookTimeout(): int
+    {
+        $timeout = max(1, (int) config('services.n8n.timeout', 10));
+        $maxExecutionTime = (int) ini_get('max_execution_time');
+
+        if ($maxExecutionTime > 0) {
+            return min($timeout, max(1, $maxExecutionTime - 5));
+        }
+
+        return $timeout;
     }
 }

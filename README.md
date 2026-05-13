@@ -29,7 +29,7 @@ Client submits inquiry
 Important files and folders:
 
 ```text
-Personal Task/
+Personal_Task/
 ├── laravel-enquiry/
 │   ├── app/
 │   ├── database/
@@ -72,7 +72,7 @@ ngrok version
 Open a terminal and go to the project folder:
 
 ```bash
-cd "/Users/fdc.brylejames-nc-web/Documents/Personal Task"
+cd "/Users/fdc.brylejames-nc-web/Documents/Personal_Task"
 ```
 
 Then enter the Laravel app:
@@ -331,7 +331,7 @@ N8N_WEBHOOK_URL=https://gabunadame.app.n8n.cloud/webhook-test/strata-enquiry
 ### Step 1: Start Laravel
 
 ```bash
-cd "/Users/fdc.brylejames-nc-web/Documents/Personal Task/laravel-enquiry"
+cd "/Users/fdc.brylejames-nc-web/Documents/Personal_Task/laravel-enquiry"
 PHP_CLI_SERVER_WORKERS=4 php -d max_execution_time=0 artisan serve --host=127.0.0.1 --port=49152 --no-reload
 ```
 
